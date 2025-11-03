@@ -1,6 +1,6 @@
 <template>
   <div>
-    <hero></hero>
+    <h1>About PhysSim</h1>
   </div>
 </template>
 

@@ -8,4 +8,16 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
   },
   css: ["./app/tailwind.css"],
+  app: {
+    head: {
+      title: "PhysSim",
+      meta: [{ name: "description", content: "A physics simulation website" }],
+      link: [
+        {
+          rel: "stylesheet",
+          href: "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css",
+        },
+      ],
+    },
+  },
 });
