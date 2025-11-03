@@ -12,8 +12,16 @@
           <details>
             <summary>Chapter</summary>
             <ul class="p-2">
-              <li><nuxt-link class="btn">Kinetics</nuxt-link></li>
-              <li><nuxt-link class="btn">Dynamics</nuxt-link></li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/Kinetics"
+                  >Kinetics</nuxt-link
+                >
+              </li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/Dynamics"
+                  >Dynamics</nuxt-link
+                >
+              </li>
             </ul>
           </details>
         </li>
