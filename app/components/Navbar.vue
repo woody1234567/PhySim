@@ -1,5 +1,5 @@
 <template>
-  <div class="navbar bg-base-100 shadow-sm">
+  <div class="navbar bg-base-100 shadow-sm sticky top-0 z-30">
     <div class="navbar-start">
       <nuxt-link class="btn btn-ghost text-xl normal-case" to="/"
         >PhysSim</nuxt-link
@@ -13,21 +13,11 @@
             <summary>Chapter</summary>
             <ul class="p-2">
               <li>
-                <nuxt-link class="btn" to="/Chapter/Kinetics"
-                  >Kinetics</nuxt-link
-                >
-              </li>
-              <li>
-                <nuxt-link class="btn" to="/Chapter/Dynamics"
-                  >Dynamics</nuxt-link
-                >
-              </li>
-              <li>
                 <nuxt-link class="btn" to="/Chapter/Incline">Incline</nuxt-link>
               </li>
               <li>
-                <nuxt-link class="btn" to="/Chapter/Incline_revised"
-                  >Incline_revised</nuxt-link
+                <nuxt-link class="btn" to="/Chapter/Projectile"
+                  >Projectile</nuxt-link
                 >
               </li>
             </ul>

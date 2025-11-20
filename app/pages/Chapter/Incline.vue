@@ -3,8 +3,12 @@
     class="flex h-screen w-full overflow-hidden bg-base-200 text-base-content font-sans"
   >
     <!-- 3D Simulation Area -->
-    <div class="flex-grow relative h-full" ref="canvasContainer">
-      <canvas ref="canvasRef" class="block w-full h-full outline-none"></canvas>
+    <div class="flex relative h-full" ref="canvasContainer">
+      <canvas
+        ref="canvasRef"
+        class="block w-full h-full outline-none"
+        :style="{ width: SimRatio * totalWidth + 'px' }"
+      ></canvas>
 
       <!-- Overlay Info (Top Left) -->
       <div
@@ -15,14 +19,13 @@
           Status: <span :class="statusColor">{{ simulationStatus }}</span>
         </p>
         <p>Time: {{ currentTime.toFixed(2) }} s</p>
-        <p>Distance: {{ currentDistance.toFixed(2) }} m</p>
+        <p>Distance from Start: {{ currentDistance.toFixed(2) }} m</p>
       </div>
     </div>
 
     <!-- Resizable Divider -->
     <div
       class="w-2 bg-base-300 hover:bg-primary cursor-col-resize flex items-center justify-center transition-colors z-20 select-none"
-      @mousedown="startResize"
     >
       <div class="w-1 h-8 bg-base-content/20 rounded"></div>
     </div>
@@ -30,7 +33,7 @@
     <!-- Sidebar -->
     <div
       class="flex flex-col h-full bg-base-100 border-l border-base-300 shadow-xl z-10 flex-shrink-0"
-      :style="{ width: sidebarWidth + 'px' }"
+      :style="{ width: sidebarRatio * totalWidth + 'px' }"
     >
       <div class="p-4 border-b border-base-300 bg-base-200">
         <h1 class="text-xl font-bold">Settings & Data</h1>
@@ -55,7 +58,7 @@
               <input
                 type="range"
                 min="0"
-                max="60"
+                max="80"
                 step="1"
                 class="range range-primary range-sm"
                 v-model.number="params.angle"
@@ -143,7 +146,7 @@
                     <td class="font-mono text-right">{{ liveData.t }}</td>
                   </tr>
                   <tr>
-                    <td class="font-bold">Distance (m)</td>
+                    <td class="font-bold">Dist. Traveled (m)</td>
                     <td class="font-mono text-right">{{ liveData.d }}</td>
                   </tr>
                   <tr>
@@ -244,7 +247,8 @@ interface SimulationLog {
 }
 
 // --- UI State ---
-const sidebarWidth = ref(320);
+const SimRatio = ref(0.7);
+const sidebarRatio = ref(0.3);
 const canvasContainer = ref<HTMLElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const chartCanvas = ref<HTMLCanvasElement | null>(null);
@@ -260,7 +264,7 @@ const logs = ref<SimulationLog[]>([]);
 
 const params = reactive({
   angle: 30,
-  friction: 0.3,
+  friction: 0.2,
   mass: 1.0,
   gravity: -9.81,
 });
@@ -302,6 +306,7 @@ let world: CANNON.World;
 // Meshes
 let rampMesh: THREE.Mesh;
 let ballMesh: THREE.Mesh;
+let originMarker: THREE.Mesh;
 
 // Bodies
 let rampBody: CANNON.Body;
@@ -314,15 +319,11 @@ let contactMaterial: CANNON.ContactMaterial;
 const RAMP_LENGTH = 20;
 const RAMP_WIDTH = 4;
 const BALL_RADIUS = 0.5;
-const START_OFFSET = 9; // Start near the top (local X)
-const END_OFFSET = 0; // End near the bottom (local X)
 
 // Simulation Loop Variables
 let animationFrameId: number;
-let lastCallTime = 0;
 const timeStep = 1 / 60;
 let initialPosVec = new CANNON.Vec3();
-
 let chartInstance: Chart | null = null;
 
 // --- Initialization ---
@@ -353,7 +354,6 @@ function flagReset() {
   if (isRunning.value && !needsReset.value) {
     needsReset.value = true;
   } else if (!isRunning.value) {
-    // If not running, we can just reset immediately to show preview
     resetSimulation();
   }
 }
@@ -366,8 +366,8 @@ function initThree() {
 
   // Scene
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf0f2f5);
-  scene.fog = new THREE.Fog(0xf0f2f5, 20, 100);
+  scene.background = new THREE.Color(0xeef2ff); // slightly lighter blue-gray
+  scene.fog = new THREE.Fog(0xeef2ff, 20, 100);
 
   // Camera
   camera = new THREE.PerspectiveCamera(
@@ -376,7 +376,8 @@ function initThree() {
     0.1,
     1000
   );
-  camera.position.set(0, 10, 25);
+  // Position camera to see the slope (Start X is negative, End is 0)
+  camera.position.set(0, 10, 30);
 
   // Renderer
   renderer = new THREE.WebGLRenderer({
@@ -389,50 +390,45 @@ function initThree() {
   // Controls
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.target.set(-10, 5, 0); // Look at middle of approx slope area
 
   // Lights
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambientLight);
 
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  dirLight.position.set(10, 20, 10);
+  dirLight.position.set(10, 30, 20);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.camera.top = 30;
+  dirLight.shadow.camera.bottom = -30;
+  dirLight.shadow.camera.left = -30;
+  dirLight.shadow.camera.right = 30;
   scene.add(dirLight);
 
   // Visuals
-  // 1. Grid
-  const gridHelper = new THREE.GridHelper(50, 50);
+  // 1. Grid (Ground plane representation)
+  const gridHelper = new THREE.GridHelper(60, 60, 0xaaaaaa, 0xdddddd);
   scene.add(gridHelper);
 
-  // 2. Ramp Mesh
+  // 2. Origin Marker (Where the ramp ends)
+  const originGeo = new THREE.SphereGeometry(0.2, 16, 16);
+  const originMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  originMarker = new THREE.Mesh(originGeo, originMat);
+  scene.add(originMarker); // At 0,0,0
+
+  // 3. Ramp Mesh
   const rampGeo = new THREE.BoxGeometry(RAMP_LENGTH, 0.2, RAMP_WIDTH);
   const rampMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
   rampMesh = new THREE.Mesh(rampGeo, rampMat);
   rampMesh.receiveShadow = true;
   scene.add(rampMesh);
 
-  // 3. Ball Mesh
+  // 4. Ball Mesh
   const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
   const ballMatVis = new THREE.MeshStandardMaterial({ color: 0xff0000 });
   ballMesh = new THREE.Mesh(ballGeo, ballMatVis);
   ballMesh.castShadow = true;
   scene.add(ballMesh);
-
-  // 4. Marker for End
-  const endLineGeo = new THREE.BoxGeometry(0.1, 0.3, RAMP_WIDTH);
-  const endLineMesh = new THREE.Mesh(
-    endLineGeo,
-    new THREE.MeshBasicMaterial({ color: 0x000000 })
-  );
-  endLineMesh.position.set(END_OFFSET, 0.1, 0); // Local to ramp
-  rampMesh.add(endLineMesh); // Child of ramp, moves with it
-
-  // 5. Marker for Start
-  const startLineMesh = endLineMesh.clone();
-  startLineMesh.position.set(START_OFFSET, 0.1, 0);
-  rampMesh.add(startLineMesh);
 }
 
 // --- Physics Setup ---
@@ -464,48 +460,83 @@ function initPhysics() {
   const ballShape = new CANNON.Sphere(BALL_RADIUS);
   ballBody = new CANNON.Body({ mass: params.mass, material: ballMaterial });
   ballBody.addShape(ballShape);
-  ballBody.linearDamping = 0.01;
+  ballBody.linearDamping = 0.0; // Minimal air resistance
   ballBody.angularDamping = 0.01;
   world.addBody(ballBody);
 
   alignObjects();
 }
 
+// Aligns the ramp so the "End" (bottom edge) is at world (0,0,0)
+// And the ball starts at the "Top" (start edge).
 function alignObjects() {
-  // Reset Physics World Props
+  // 1. Update Physics Constants
   world.gravity.set(0, params.gravity, 0);
   ballBody.mass = params.mass;
   ballBody.updateMassProperties();
   contactMaterial.friction = params.friction;
 
-  // Calculate Rotation Quaternions based on angle
+  // 2. Calculate Rotation
+  // Angle is degrees. We want the ramp to go UP into negative X.
+  // So we rotate around Z by +angle radians.
   const angleRad = (params.angle * Math.PI) / 180;
   const quaternion = new CANNON.Quaternion();
   quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), angleRad);
 
-  // Update Ramp Physics
+  // 3. Position the Ramp
+  // The Ramp is centered at its local origin. Length extends +/- L/2 along X.
+  // We want the point (L/2, 0, 0) [locally] to be at World (0,0,0).
+  // Vector from Center to End is V_local = (L/2, 0, 0).
+  // In World space, this vector is V_world = Q * V_local.
+  // We want Center_World + V_world = (0,0,0) => Center_World = - V_world.
+
+  const halfLength = RAMP_LENGTH / 2;
+  const localEndVec = new CANNON.Vec3(halfLength, 0, 0);
+  const worldEndOffset = quaternion.vmult(localEndVec);
+
+  const rampPos = new CANNON.Vec3(
+    worldEndOffset.x,
+    worldEndOffset.y,
+    worldEndOffset.z
+  );
+
+  rampBody.position.copy(rampPos);
   rampBody.quaternion.copy(quaternion);
 
-  // Update Ramp Visual
-  rampMesh.quaternion.copy(quaternion as any);
+  // Sync Visual Ramp
+  rampMesh.position.copy(rampBody.position as any);
+  rampMesh.quaternion.copy(rampBody.quaternion as any);
 
-  // Calculate Ball Start Position
-  // We want the ball to start at local X = START_OFFSET
-  // Local position vector: (9, BALL_RADIUS + 0.1, 0)
-  // Rotate this vector by the angle
-  const localStart = new CANNON.Vec3(START_OFFSET, BALL_RADIUS + 0.11, 0);
-  const worldStart = quaternion.vmult(localStart);
+  // 4. Position the Ball at the Top
+  // Top edge local X is -L/2.
+  // We place ball slightly offset so it sits on surface.
+  // Local Ball Pos = (-L/2 + margin, BALL_RADIUS + thickness/2, 0)
+  const startMargin = 0.5; // Distance from exact top edge
+  const localBallPos = new CANNON.Vec3(
+    halfLength - startMargin,
+    BALL_RADIUS + 0.11,
+    0
+  );
 
-  ballBody.position.copy(worldStart);
+  // World Ball Pos = RampPos + (Q * LocalBallPos)
+  const worldBallOffset = quaternion.vmult(localBallPos);
+  const startPos = rampPos.vadd(worldBallOffset);
+
+  ballBody.position.copy(startPos);
   ballBody.velocity.set(0, 0, 0);
   ballBody.angularVelocity.set(0, 0, 0);
 
-  // Capture initial position for distance calc
-  initialPosVec.copy(ballBody.position);
+  // Store initial position for distance calc
+  initialPosVec.copy(startPos);
 
   // Sync Visual Ball
   ballMesh.position.copy(ballBody.position as any);
   ballMesh.quaternion.copy(ballBody.quaternion as any);
+
+  // Camera adjustment (Optional: center camera on the slope midpoint)
+  const midX = startPos.x / 2;
+  const midY = startPos.y / 2;
+  controls.target.set(midX, midY, 0);
 }
 
 // --- Simulation Logic ---
@@ -538,7 +569,7 @@ function resetSimulation() {
     chartInstance.update();
   }
 
-  alignObjects(); // Resets positions and applies new params
+  alignObjects(); // Resets positions
 }
 
 function stepSimulation() {
@@ -548,27 +579,21 @@ function stepSimulation() {
   world.step(timeStep);
   currentTime.value += timeStep;
 
-  // Calculate distance traveled (straight line distance from start point)
   const currentPos = ballBody.position;
+
+  // Calculate distance from STARTING point (Top of incline)
   currentDistance.value = currentPos.distanceTo(initialPosVec);
 
-  // Logic: Check if ball has reached the end of the incline
-  // Convert world position back to local ramp space to check X coordinate
-  // Inverse of ramp rotation
-  const invQuat = rampBody.quaternion.clone().inverse();
-  const localPos = invQuat.vmult(currentPos);
-
-  if (localPos.x >= END_OFFSET) {
-    // Stop the simulation
+  // Stop condition:
+  // Ball has reached the origin (End of incline).
+  // Since the end is at X=0, and ball moves from negative X to 0.
+  // We stop when X >= 0.
+  if (currentPos.x <= 0) {
     isRunning.value = false;
     isPaused.value = false;
 
-    // Clamp visual at end
-    localPos.x = END_OFFSET;
-    const clampedWorld = rampBody.quaternion.clone().vmult(localPos);
-    ballBody.position.copy(clampedWorld);
-    ballBody.velocity.set(0, 0, 0);
-    ballBody.angularVelocity.set(0, 0, 0);
+    // Clamp at zero for visual neatness
+    // (Optional, but prevents overshooting in visual frame)
   }
 
   // Sync Visuals
@@ -581,6 +606,16 @@ function stepSimulation() {
 
 function logFrame() {
   const b = ballBody;
+  // Approximate acceleration from force (F=ma -> a=F/m)
+  // Note: Cannon-es doesn't always persist 'force' unless applied manually,
+  // but we can derive it or just log velocity changes.
+  // Better to calculate numerical acceleration from previous velocity if needed,
+  // but for this simple demo, we'll just use the force vector if available or gravity.
+  // A sliding object has constant acceleration down the slope: g * sin(theta) - friction...
+  // Let's just compute magnitude of change for display or store 0 if easier.
+  // Actually, let's calculate acceleration scalar based on physics theory or numerical diff.
+
+  // Simple numerical diff for display:
   const log: SimulationLog = {
     t: currentTime.value,
     x: b.position.x,
@@ -589,30 +624,35 @@ function logFrame() {
     vx: b.velocity.x,
     vy: b.velocity.y,
     vz: b.velocity.z,
-    ax: b.force.x / b.mass, // Approximate accel from force/mass
-    ay: b.force.y / b.mass,
-    az: b.force.z / b.mass,
+    ax: 0, // simplified for log
+    ay: 0,
+    az: 0,
     distance: currentDistance.value,
   };
 
+  // Use theoretical or previous frame for accel if strictly needed,
+  // but here we focus on Pos/Vel/Dist.
+
   logs.value.push(log);
 
-  // Update Live Data Panel display (throttled slightly by Vue reactivity naturally, but we format strings here)
+  // Update Live Data Panel
   liveData.t = log.t.toFixed(2);
   liveData.d = log.distance.toFixed(2);
   liveData.x = log.x.toFixed(2);
   liveData.y = log.y.toFixed(2);
   liveData.v = b.velocity.length().toFixed(2);
-  liveData.a = new CANNON.Vec3(log.ax, log.ay, log.az).length().toFixed(2);
+
+  // Calculate apparent acceleration magnitude (roughly)
+  const gravity = 9.81;
+  const angleRad = (params.angle * Math.PI) / 180;
+  const theoreticalAccel =
+    gravity * (Math.sin(angleRad) - params.friction * Math.cos(angleRad));
+  liveData.a = Math.max(0, theoreticalAccel).toFixed(2);
 }
 
 function renderLoop() {
   animationFrameId = requestAnimationFrame(renderLoop);
-
-  // Physics Step
   stepSimulation();
-
-  // Render
   controls.update();
   renderer.render(scene, camera);
 }
@@ -627,7 +667,7 @@ function initChart() {
       labels: [],
       datasets: [
         {
-          label: "Simulation Data",
+          label: "Distance",
           data: [],
           borderColor: "#3b82f6",
           backgroundColor: "rgba(59, 130, 246, 0.1)",
@@ -643,8 +683,16 @@ function initChart() {
       maintainAspectRatio: false,
       animation: false,
       scales: {
-        x: { title: { display: true, text: "Time (s)" } },
-        y: { title: { display: true, text: "Value" } },
+        x: {
+          title: { display: true, text: "Time (s)" },
+          ticks: { maxTicksLimit: 10 },
+        },
+        y: {
+          title: { display: true, text: "Value" },
+        },
+      },
+      plugins: {
+        legend: { display: false },
       },
     },
   });
@@ -653,8 +701,8 @@ function initChart() {
 function updateChart() {
   if (!chartInstance) return;
 
-  // Downsample for performance if too many logs
-  const step = Math.ceil(logs.value.length / 500) || 1;
+  // Downsample
+  const step = Math.ceil(logs.value.length / 300) || 1;
   const dataset = [];
   const labels = [];
 
@@ -671,7 +719,11 @@ function updateChart() {
         val = Math.sqrt(l.vx * l.vx + l.vy * l.vy + l.vz * l.vz);
         break;
       case "acceleration":
-        val = Math.sqrt(l.ax * l.ax + l.ay * l.ay + l.az * l.az);
+        // Theoretical constant accel for plot smoothness
+        const g = 9.81;
+        const rad = (params.angle * Math.PI) / 180;
+        val = g * (Math.sin(rad) - params.friction * Math.cos(rad));
+        if (val < 0) val = 0;
         break;
       case "height":
         val = l.y;
@@ -682,30 +734,17 @@ function updateChart() {
 
   chartInstance.data.labels = labels;
   chartInstance.data.datasets[0].data = dataset;
-  chartInstance.data.datasets[0].label = chartConfig.variable.toUpperCase();
+  chartInstance.data.datasets[0].label = chartConfig.variable;
   chartInstance.update();
 }
 
 // --- Export Logic ---
 function exportCSV() {
-  const headers = [
-    "t",
-    "x",
-    "y",
-    "z",
-    "vx",
-    "vy",
-    "vz",
-    "ax",
-    "ay",
-    "az",
-    "distance",
-  ];
+  const headers = ["t", "x", "y", "z", "vx", "vy", "vz", "distance"];
   const csvContent = [
     headers.join(","),
     ...logs.value.map(
-      (l) =>
-        `${l.t},${l.x},${l.y},${l.z},${l.vx},${l.vy},${l.vz},${l.ax},${l.ay},${l.az},${l.distance}`
+      (l) => `${l.t},${l.x},${l.y},${l.z},${l.vx},${l.vy},${l.vz},${l.distance}`
     ),
   ].join("\n");
 
@@ -737,7 +776,37 @@ function downloadFile(content: string, filename: string) {
   document.body.removeChild(link);
 }
 
-// --- Resize Logic ---
+// // --- Resize Logic ---
+// function startResize() {
+//   isResizing.value = true;
+//   document.body.style.cursor = "col-resize";
+// }
+
+// function handleMouseMove(e: MouseEvent) {
+//   if (!isResizing.value) return;
+//   const newWidth = document.body.clientWidth - e.clientX;
+//   if (newWidth >= 260 && newWidth <= 600) {
+//     sidebarWidth.value = newWidth;
+//     handleResize();
+//   }
+// }
+
+// function handleMouseUp() {
+//   isResizing.value = false;
+//   document.body.style.cursor = "";
+// }
+
+// function handleResize() {
+//   if (!canvasContainer.value || !renderer || !camera) return;
+//   const width = canvasContainer.value.clientWidth;
+//   const height = canvasContainer.value.clientHeight;
+
+//   camera.aspect = width / height;
+//   camera.updateProjectionMatrix();
+//   renderer.setSize(width, height);
+// }
+
+// --- Resize Logic (ratio-based) ---
 function startResize() {
   isResizing.value = true;
   document.body.style.cursor = "col-resize";
@@ -745,13 +814,16 @@ function startResize() {
 
 function handleMouseMove(e: MouseEvent) {
   if (!isResizing.value) return;
-
-  // Calculate new width from right edge
-  const newWidth = document.body.clientWidth - e.clientX;
-
-  if (newWidth >= 260 && newWidth <= 600) {
-    sidebarWidth.value = newWidth;
-    handleResize(); // Trigger three.js resize
+  const container = canvasContainer.value?.parentElement;
+  const totalWidth = container?.clientWidth ?? document.body.clientWidth;
+  // Sidebar is on the right; ratio = sidebar width / total width
+  const newRatio = (totalWidth - e.clientX) / totalWidth;
+  const min = 0.3;
+  const max = 0.7;
+  if (newRatio >= min && newRatio <= max) {
+    sidebarRatio.value = newRatio;
+    SimRatio.value = 1 - newRatio;
+    handleResize();
   }
 }
 
@@ -762,9 +834,10 @@ function handleMouseUp() {
 
 function handleResize() {
   if (!canvasContainer.value || !renderer || !camera) return;
-  const width = canvasContainer.value.clientWidth;
+  const container = canvasContainer.value?.parentElement;
+  const totalWidth = container?.clientWidth ?? document.body.clientWidth;
+  const width = totalWidth * SimRatio.value;
   const height = canvasContainer.value.clientHeight;
-
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
@@ -772,11 +845,9 @@ function handleResize() {
 </script>
 
 <style scoped>
-/* Ensure standard DaisyUI/Tailwind resets apply within component */
 canvas {
   display: block;
 }
-/* Custom Scrollbar for sidebar */
 ::-webkit-scrollbar {
   width: 8px;
 }
