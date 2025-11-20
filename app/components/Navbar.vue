@@ -7,7 +7,7 @@
     </div>
     <div class="navbar-end hidden lg:flex">
       <ul class="menu menu-horizontal px-5 font-bold">
-        <li><nuxt-link to="/About">About</nuxt-link></li>
+        <li><nuxt-link to="/about">About</nuxt-link></li>
         <li>
           <details>
             <summary>Chapter</summary>
