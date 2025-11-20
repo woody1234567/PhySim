@@ -20,6 +20,11 @@
                   >Projectile</nuxt-link
                 >
               </li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/Pendulum"
+                  >Pendulum</nuxt-link
+                >
+              </li>
             </ul>
           </details>
         </li>
