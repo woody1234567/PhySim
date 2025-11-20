@@ -45,6 +45,13 @@ const simulations = [
     image: "https://picsum.photos/seed/incline/400/250",
     to: "/Chapter/Incline",
   },
+  {
+    title: "Three Body Simulation",
+    description:
+      "Observe the complex gravitational interactions between three bodies. Adjust masses and watch the chaotic orbits unfold.",
+    image: "https://picsum.photos/seed/threebody/400/250",
+    to: "/Chapter/ThreeBodySimulation",
+  },
 ];
 </script>
 
