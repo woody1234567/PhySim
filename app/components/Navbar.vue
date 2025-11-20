@@ -22,6 +22,14 @@
                   >Dynamics</nuxt-link
                 >
               </li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/Incline">Incline</nuxt-link>
+              </li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/Incline_revised"
+                  >Incline_revised</nuxt-link
+                >
+              </li>
             </ul>
           </details>
         </li>

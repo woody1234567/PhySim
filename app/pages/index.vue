@@ -11,9 +11,6 @@
   </div>
 </template>
 
-<script setup>
-import SimCard from "~/components/SimCard.vue";
-import Hero from "~/components/Hero.vue";
-</script>
+<script setup></script>
 
 <style scoped></style>
