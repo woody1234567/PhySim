@@ -38,7 +38,7 @@
 
     <!-- Resizer Handle -->
     <div
-      class="w-2 h-full bg-base-300 hover:bg-primary cursor-col-resize flex items-center justify-center z-50 select-none transition-colors shadow-md"
+      class="w-2 h-full bg-base-300 hover:bg-primary cursor-col-resize flex items-center justify-center select-none transition-colors shadow-md"
       @mousedown="startResize"
     >
       <div class="h-8 w-1 bg-base-content/20 rounded"></div>
@@ -46,7 +46,7 @@
 
     <!-- Right Panel: Sidebar -->
     <div
-      class="flex flex-col h-full bg-base-100 border-l border-base-300 shadow-2xl shrink-0 z-40"
+      class="flex flex-col h-full bg-base-100 border-l border-base-300 shadow-2xl shrink-0"
       :style="{ width: sidebarWidth + 'px' }"
     >
       <div
@@ -295,7 +295,7 @@ const isRunning = ref(false);
 
 // Physics Configuration
 const params = reactive({
-  length: 5.0,
+  length: 10.0,
   mass: 2.0,
   angle: 45, // degrees
 });
