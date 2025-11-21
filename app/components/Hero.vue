@@ -20,7 +20,7 @@
         <p
           class="text-xl md:text-3xl font-light drop-shadow-md text-gray-200 mb-8"
         >
-          PhysSim, your learning companion.
+          PhySim, your learning companion.
         </p>
         <button
           class="btn btn-primary btn-lg pointer-events-auto hover:scale-105 transition-transform shadow-[0_0_20px_rgba(var(--p),0.5)]"

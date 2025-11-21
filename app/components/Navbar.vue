@@ -2,7 +2,7 @@
   <div class="navbar bg-base-100 shadow-sm sticky top-0 z-30">
     <div class="navbar-start">
       <nuxt-link class="btn btn-ghost text-xl normal-case" to="/"
-        >PhysSim</nuxt-link
+        >PhySim</nuxt-link
       >
     </div>
     <div class="navbar-end hidden lg:flex">
@@ -34,6 +34,11 @@
               <li>
                 <nuxt-link class="btn" to="/Chapter/PhysicsDoppler"
                   >Doppler effect</nuxt-link
+                >
+              </li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/StoppingDistanceSim"
+                  >stoppingDistanceSim</nuxt-link
                 >
               </li>
             </ul>

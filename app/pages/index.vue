@@ -59,6 +59,13 @@ const simulations = [
     image: "https://picsum.photos/seed/doppler/400/250",
     to: "/Chapter/PhysicsDoppler",
   },
+  {
+    title: "Stopping distance",
+    description:
+      "visualize and get the raw data about stopping distance of the vehicle.",
+    image: "https://picsum.photos/seed/doppler/400/250",
+    to: "/Chapter/StoppingDistanceSim",
+  },
 ];
 </script>
 
