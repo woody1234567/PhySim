@@ -7,6 +7,7 @@
     </div>
     <div class="navbar-end hidden lg:flex">
       <ul class="menu menu-horizontal px-5 font-bold">
+        <li><nuxt-link to="/">Home</nuxt-link></li>
         <li><nuxt-link to="/about">About</nuxt-link></li>
         <li>
           <details>
@@ -37,6 +38,9 @@
               </li>
             </ul>
           </details>
+        </li>
+        <li>
+          <nuxt-link to="/about">Contact me</nuxt-link>
         </li>
       </ul>
     </div>
