@@ -2,12 +2,11 @@
   <div class="relative w-full h-[80vh] bg-black overflow-hidden">
     <canvas
       ref="canvasRef"
-      class="absolute top-0 left-0 w-full h-full block outline-none"
+      class="absolute top-0 left-0 flex h-full block outline-none"
     ></canvas>
-
     <div
-      class="absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-1000"
-      :class="{ 'opacity-100': showText, 'opacity-0': !showText }"
+      class="absolute inset-0 flex items-center justify-end pointer-events-none transition-opacity duration-1000"
+      :class="{ 'opacity-90': showText, 'opacity-0': !showText }"
     >
       <div
         class="text-center text-white px-4 max-w-3xl bg-black/40 backdrop-blur-sm rounded-xl p-8 border border-white/10 shadow-2xl"
@@ -15,8 +14,8 @@
         <h1
           class="text-4xl md:text-6xl font-bold mb-6 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] leading-tight"
         >
-          In order to explore the universe, <br />
-          <span class="text-primary">you need to learn physics.</span>
+          Learning physics <br />
+          <span class="text-primary">with world in your hand</span>
         </h1>
         <p
           class="text-xl md:text-3xl font-light drop-shadow-md text-gray-200 mb-8"
@@ -153,6 +152,7 @@ const animate = () => {
   // Smooth camera movement (Zoom in)
   camera.position.lerp(targetCameraPosition, 0.02);
   camera.lookAt(lookAtPosition);
+  console.log(camera.position.distanceTo(targetCameraPosition));
 
   // Check if camera is close enough to show text
   if (camera.position.distanceTo(targetCameraPosition) < 0.5) {
