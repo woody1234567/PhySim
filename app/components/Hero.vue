@@ -45,6 +45,7 @@
 <script setup>
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const canvasRef = ref(null);
 const showText = ref(false);
@@ -58,6 +59,11 @@ const initThree = () => {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x050505); // Very dark gray, almost black
   scene.fog = new THREE.FogExp2(0x050505, 0.002); // Add fog for depth
+
+  // // Add grid helper
+  // const grid = new THREE.GridHelper(30, 30, 0x334155, 0x1e293b);
+  // grid.position.y = -10;
+  // scene.add(grid);
 
   // Camera setup
   camera = new THREE.PerspectiveCamera(
@@ -138,7 +144,7 @@ const initThree = () => {
   window.addEventListener("resize", onWindowResize);
 };
 
-const targetCameraPosition = new THREE.Vector3(0, 1, 4); // Target close-up position
+const targetCameraPosition = new THREE.Vector3(0, 1, 3); // Target close-up position
 const lookAtPosition = new THREE.Vector3(0, 0, 0);
 
 const animate = () => {
@@ -147,13 +153,16 @@ const animate = () => {
   if (model) {
     // Rotate model slowly
     model.rotation.y += 0.001;
+
+    // let the model stop at rotation 0.7
+    if (model.rotation.y > 0.7) {
+      model.rotation.y -= 0.001;
+    }
   }
 
   // Smooth camera movement (Zoom in)
   camera.position.lerp(targetCameraPosition, 0.02);
   camera.lookAt(lookAtPosition);
-  console.log(camera.position.distanceTo(targetCameraPosition));
-
   // Check if camera is close enough to show text
   if (camera.position.distanceTo(targetCameraPosition) < 0.5) {
     showText.value = true;
