@@ -13,6 +13,19 @@
       >
         Loading 3D Environment...
       </div>
+
+      <!-- Overlay: Legend -->
+      <div
+        class="absolute top-4 right-4 pointer-events-none bg-base-100/80 p-2 rounded border border-base-300 text-xs shadow-lg backdrop-blur"
+      >
+        <div class="font-bold mb-1">Vectors</div>
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-green-500"></span> Velocity
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-red-500"></span> Acceleration
+        </div>
+      </div>
     </div>
     <!-- RESIZER BAR -->
     <div
@@ -150,6 +163,12 @@
                     </td>
                   </tr>
                   <tr>
+                    <th>Acc (X,Y,Z)</th>
+                    <td>
+                      {{ liveData.ax }}, {{ liveData.ay }}, {{ liveData.az }}
+                    </td>
+                  </tr>
+                  <tr>
                     <th>Speed</th>
                     <td>{{ liveData.speed }} m/s</td>
                   </tr>
@@ -240,6 +259,9 @@ const liveData = reactive({
   vx: "0.00",
   vy: "0.00",
   vz: "0.00",
+  ax: "0.00",
+  ay: "0.00",
+  az: "0.00",
   speed: "0.00",
 });
 
@@ -252,6 +274,9 @@ interface DataPoint {
   vx: number;
   vy: number;
   vz: number;
+  ax: number;
+  ay: number;
+  az: number;
 }
 let dataLogs: DataPoint[] = [];
 
@@ -263,6 +288,8 @@ let controls: OrbitControls;
 let ballMesh: THREE.Mesh;
 let groundMesh: THREE.Mesh;
 let trajectoryLine: THREE.Line;
+let velocityArrow: THREE.ArrowHelper;
+let accelArrow: THREE.ArrowHelper;
 
 // Cannon.js Globals
 let world: CANNON.World;
@@ -377,6 +404,23 @@ const initThree = () => {
   trajectoryLine = new THREE.Line(lineGeo, lineMat);
   scene.add(trajectoryLine);
 
+  // 4. Vectors
+  velocityArrow = new THREE.ArrowHelper(
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 0, 0),
+    1,
+    0x22c55e // Green
+  );
+  scene.add(velocityArrow);
+
+  accelArrow = new THREE.ArrowHelper(
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 0, 0),
+    1,
+    0xef4444 // Red
+  );
+  scene.add(accelArrow);
+
   // Initial render
   renderer.render(scene, camera);
 };
@@ -473,8 +517,14 @@ const stepSimulation = () => {
   if (isPaused.value || isFinished.value) return;
 
   // Step physics
+  // Step physics
   const timeStep = 1 / 60;
+  const vPrev = ballBody.velocity.clone(); // Capture previous velocity
   world.step(timeStep);
+  const vCurr = ballBody.velocity;
+
+  // Calculate Acceleration (a = dv/dt)
+  const accel = vCurr.vsub(vPrev).scale(1 / timeStep);
 
   // Sync Mesh
   ballMesh.position.copy(ballBody.position as any);
@@ -493,11 +543,15 @@ const stepSimulation = () => {
     vx: parseFloat(vel.x.toFixed(3)),
     vy: parseFloat(vel.y.toFixed(3)),
     vz: parseFloat(vel.z.toFixed(3)),
+    ax: parseFloat(accel.x.toFixed(3)),
+    ay: parseFloat(accel.y.toFixed(3)),
+    az: parseFloat(accel.z.toFixed(3)),
   };
 
   dataLogs.push(frameData);
   updateLiveData(frameData);
   updateTrajectory();
+  updateVectors(vel, accel);
 
   // Stop Condition: Touching ground
   // Use a small threshold epsilon
@@ -519,7 +573,38 @@ const updateLiveData = (d: DataPoint) => {
   liveData.vx = d.vx.toFixed(2);
   liveData.vy = d.vy.toFixed(2);
   liveData.vz = d.vz.toFixed(2);
+  liveData.ax = d.ax.toFixed(2);
+  liveData.ay = d.ay.toFixed(2);
+  liveData.az = d.az.toFixed(2);
   liveData.speed = Math.sqrt(d.vx ** 2 + d.vy ** 2 + d.vz ** 2).toFixed(2);
+};
+
+const updateVectors = (vel: CANNON.Vec3, accel: CANNON.Vec3) => {
+  // Velocity Vector (Green)
+  const vLen = vel.length();
+  if (vLen > 0.01) {
+    velocityArrow.visible = true;
+    velocityArrow.setDirection(
+      new THREE.Vector3(vel.x, vel.y, vel.z).normalize()
+    );
+    velocityArrow.setLength(vLen * 0.2); // Scale down for visualization
+    velocityArrow.position.copy(ballMesh.position);
+  } else {
+    velocityArrow.visible = false;
+  }
+
+  // Acceleration Vector (Red)
+  const aLen = accel.length();
+  if (aLen > 0.01) {
+    accelArrow.visible = true;
+    accelArrow.setDirection(
+      new THREE.Vector3(accel.x, accel.y, accel.z).normalize()
+    );
+    accelArrow.setLength(aLen * 0.2); // Scale down for visualization
+    accelArrow.position.copy(ballMesh.position);
+  } else {
+    accelArrow.visible = false;
+  }
 };
 
 const updateTrajectory = () => {
@@ -595,9 +680,10 @@ const exportChartCSV = () => {
 const exportLogsToCSV = () => {
   if (dataLogs.length === 0) return;
 
-  const headers = ["time", "x", "y", "z", "vx", "vy", "vz"];
+  const headers = ["time", "x", "y", "z", "vx", "vy", "vz", "ax", "ay", "az"];
   const rows = dataLogs.map(
-    (d) => `${d.t},${d.x},${d.y},${d.z},${d.vx},${d.vy},${d.vz}`
+    (d) =>
+      `${d.t},${d.x},${d.y},${d.z},${d.vx},${d.vy},${d.vz},${d.ax},${d.ay},${d.az}`
   );
 
   const csvContent = [headers.join(","), ...rows].join("\n");
