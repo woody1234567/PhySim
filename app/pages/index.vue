@@ -52,6 +52,13 @@ const simulations = [
     image: "https://picsum.photos/seed/threebody/400/250",
     to: "/Chapter/ThreeBodySimulation",
   },
+  {
+    title: "Doppler Effect",
+    description:
+      "Explore the Doppler effect in sound waves. Adjust velocity and observe how the frequency changes.",
+    image: "https://picsum.photos/seed/doppler/400/250",
+    to: "/Chapter/PhysicsDoppler",
+  },
 ];
 </script>
 
