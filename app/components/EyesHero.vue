@@ -41,8 +41,6 @@ let animationId = 0;
 // Eye groups
 let leftEye!: THREE.Group;
 let rightEye!: THREE.Group;
-// Pupils kept for reference if needed, but movement is now rotational
-// so we don't necessarily need to move these meshes directly.
 let leftPupil!: THREE.Mesh;
 let rightPupil!: THREE.Mesh;
 
@@ -60,97 +58,26 @@ let idleTime = 0;
 const EYE_RADIUS = 0.6;
 const PUPIL_RADIUS = 0.18;
 const IRIS_RADIUS = 0.28;
-// Max pupil offset logic is removed since we rotate the eye now.
+// Max pupil offset from center so it never leaves the sclera
+const MAX_OFFSET = IRIS_RADIUS - PUPIL_RADIUS - 0.06;
 
 function buildEye(): { group: THREE.Group; pupil: THREE.Mesh } {
   const group = new THREE.Group();
 
-  // Basic Sclera (White sphere)
+  // Sclera (white)
   const scleraGeo = new THREE.SphereGeometry(EYE_RADIUS, 48, 48);
   const scleraMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     roughness: 0.35,
     metalness: 0.0,
-    transmission: 0,
+    transmission: 0, // opaque
     reflectivity: 0.2,
   });
   const sclera = new THREE.Mesh(scleraGeo, scleraMat);
   group.add(sclera);
 
-  // Geometry constants for caps
-  const irisArc = IRIS_RADIUS / EYE_RADIUS;
-  const pupilArc = PUPIL_RADIUS / EYE_RADIUS;
-
-  // 1. Iris Cap (Point to Z+ by rotating X -90deg later)
-  const irisR = EYE_RADIUS + 0.002;
-  const irisGeo = new THREE.SphereGeometry(
-    irisR,
-    32,
-    16,
-    0,
-    Math.PI * 2,
-    0,
-    irisArc
-  );
-  const irisMat = new THREE.MeshStandardMaterial({
-    color: 0x3a6ea5,
-    roughness: 0.6,
-    metalness: 0.0,
-  });
-  const iris = new THREE.Mesh(irisGeo, irisMat);
-  iris.rotation.x = -Math.PI / 2;
-  group.add(iris);
-
-  // 2. Pupil Cap
-  const pupilR = irisR + 0.002;
-  const pupilGeo = new THREE.SphereGeometry(
-    pupilR,
-    32,
-    16,
-    0,
-    Math.PI * 2,
-    0,
-    pupilArc
-  );
-  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  const pupil = new THREE.Mesh(pupilGeo, pupilMat);
-  pupil.rotation.x = -Math.PI / 2;
-  group.add(pupil);
-
-  // 3. Occlusion Ring (Simulated by a spherical slice)
-  const ringR = irisR + 0.001;
-  const ringInner = irisArc * 0.9;
-  const ringOuter = irisArc * 1.2;
-  const ringGeo = new THREE.SphereGeometry(
-    ringR,
-    32,
-    8,
-    0,
-    Math.PI * 2,
-    ringInner,
-    ringOuter - ringInner
-  );
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: 0x000000,
-    transparent: true,
-    opacity: 0.12,
-    side: THREE.DoubleSide,
-  });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.rotation.x = -Math.PI / 2;
-  group.add(ring);
-
-  // 4. Cornea (Glassy bulge)
-  const corneaR = EYE_RADIUS + 0.005;
-  const corneaGeo = new THREE.SphereGeometry(
-    corneaR,
-    48,
-    48,
-    0,
-    Math.PI * 2,
-    0,
-    0.8 // A large cap to cover the front
-  );
+  // Slight cornea bulge (subtle specular)
+  const corneaGeo = new THREE.SphereGeometry(EYE_RADIUS * 1.01, 48, 48);
   const corneaMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     roughness: 0.05,
@@ -160,19 +87,52 @@ function buildEye(): { group: THREE.Group; pupil: THREE.Mesh } {
     ior: 1.38,
   });
   const cornea = new THREE.Mesh(corneaGeo, corneaMat);
-  cornea.rotation.x = -Math.PI / 2;
   group.add(cornea);
+
+  // Iris (disk sitting slightly above sclera)
+  const irisGeo = new THREE.CircleGeometry(IRIS_RADIUS, 48);
+  const irisMat = new THREE.MeshStandardMaterial({
+    color: 0x3a6ea5, // blue iris; feel free to tweak
+    roughness: 0.6,
+    metalness: 0.0,
+  });
+  const iris = new THREE.Mesh(irisGeo, irisMat);
+  iris.position.z = EYE_RADIUS + 0.01;
+  group.add(iris);
+
+  // Pupil (circle on top of iris, we will move this mesh)
+  const pupilGeo = new THREE.CircleGeometry(PUPIL_RADIUS, 48);
+  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+  const pupil = new THREE.Mesh(pupilGeo, pupilMat);
+  pupil.position.z = iris.position.z + 0.005;
+  group.add(pupil);
+
+  // Soft ambient occlusion ring (fake shadow)
+  const ringGeo = new THREE.RingGeometry(
+    IRIS_RADIUS * 0.92,
+    IRIS_RADIUS * 1.2,
+    64
+  );
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.12,
+    side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.z = iris.position.z + 0.001;
+  group.add(ring);
 
   return { group, pupil };
 }
 
-function lookAtPointForEye(eye: THREE.Group, target: THREE.Vector3) {
-  // Simple LookAt with constraints
-  // Smoothly interpolate current rotation to target rotation
-  const startQ = eye.quaternion.clone();
-  eye.lookAt(target);
-  const targetQ = eye.quaternion.clone();
-  eye.quaternion.copy(startQ).slerp(targetQ, 0.1);
+function clampOffset(vec: THREE.Vector3, maxLen: number) {
+  const len = Math.hypot(vec.x, vec.y);
+  if (len > maxLen && len > 0) {
+    const s = maxLen / len;
+    vec.x *= s;
+    vec.y *= s;
+  }
 }
 
 function onPointerMove(e: PointerEvent) {
@@ -204,15 +164,15 @@ function createScene(canvas: HTMLCanvasElement) {
   scene.background = new THREE.Color(0xf6f7fb);
 
   camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-  camera.position.set(0, 10, 20);
+  camera.position.set(0, 10, 20); // Moved back slightly to see the whole robot
 
   renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
     powerPreference: "high-performance",
-    alpha: true,
+    alpha: true, // Enable transparency for the canvas
   });
-  renderer.setClearColor(0x000000, 0);
+  renderer.setClearColor(0x000000, 0); // Transparent background
   onResize();
 
   // Controls
@@ -234,26 +194,32 @@ function createScene(canvas: HTMLCanvasElement) {
   const loader = new GLTFLoader();
   loader.load("/models/robot/scene.gltf", (gltf: any) => {
     const robot = gltf.scene;
-    robot.position.y = -2;
+    // Adjust scale and position based on typical model sizes; may need tuning
+    // robot.scale.set(1.5, 1.5, 1.5);
+    robot.position.y = -2; // Move down to center the face
     robot.rotation.y = 1.57;
     scene.add(robot);
 
-    // Create Eyes
+    // Create Eyes and attach to robot or scene
+    // Because the robot might have its own transforms, let's add eyes to the scene for now
+    // and position them where the robot's eyes likely are.
+
     ({ group: leftEye, pupil: leftPupil } = buildEye());
     ({ group: rightEye, pupil: rightPupil } = buildEye());
 
+    // Scale eyes down to fit the robot face (assuming robot head is roughly human-sized scaled up)
     const EYE_SCALE = 1.1;
     leftEye.scale.set(EYE_SCALE, EYE_SCALE, EYE_SCALE);
     rightEye.scale.set(EYE_SCALE, EYE_SCALE, EYE_SCALE);
 
-    // Positions adjusted by user
+    // Estimated positions for the robot's eye sockets
     leftEye.position.set(-0.7, 4.7, 1.5);
     rightEye.position.set(0.7, 4.7, 1.5);
 
     scene.add(leftEye, rightEye);
   });
 
-  // Basic floor
+  // Soft floor to ground the scene visually
   const floorGeo = new THREE.CircleGeometry(6, 64);
   const floorMat = new THREE.MeshBasicMaterial({
     color: 0x000000,
@@ -262,9 +228,43 @@ function createScene(canvas: HTMLCanvasElement) {
   });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -2.0;
+  floor.position.y = -2.0; // aligned with robot feet
   floor.position.z = -0.5;
   scene.add(floor);
+}
+
+function lookAtPointForEye(
+  eye: THREE.Group,
+  pupil: THREE.Mesh,
+  target: THREE.Vector3
+) {
+  // Convert target into the eye's local space (so we can compute local x/y offsets)
+  const local = eye.worldToLocal(target.clone());
+
+  // Project onto the eye's front plane (z ~ EYE_RADIUS)
+  // We want a 2D offset on the iris plane
+  const offset = new THREE.Vector3(local.x, local.y, 0);
+
+  // Scale down sensitivity
+  offset.multiplyScalar(0.35);
+  clampOffset(offset, MAX_OFFSET);
+
+  // Animate toward target (lerp for smoothness)
+  pupil.position.x = THREE.MathUtils.lerp(pupil.position.x, offset.x, 0.2);
+  pupil.position.y = THREE.MathUtils.lerp(pupil.position.y, offset.y, 0.2);
+
+  // Slight eyeball rotation to sell the effect
+  const ROT_MAX = 0.18;
+  eye.rotation.y = THREE.MathUtils.clamp(
+    THREE.MathUtils.lerp(eye.rotation.y, -offset.x * 0.25, 0.18),
+    -ROT_MAX,
+    ROT_MAX
+  );
+  eye.rotation.x = THREE.MathUtils.clamp(
+    THREE.MathUtils.lerp(eye.rotation.x, offset.y * 0.25, 0.18),
+    -ROT_MAX,
+    ROT_MAX
+  );
 }
 
 function animate() {
@@ -274,7 +274,7 @@ function animate() {
 
   if (!leftEye || !rightEye) return;
 
-  // Determine target
+  // Determine a 3D target point on z=0 plane
   let target: THREE.Vector3;
   if (isPointerActive) {
     raycaster.setFromCamera(mouseNDC, camera);
@@ -282,7 +282,7 @@ function animate() {
     target = hitPoint;
     idleTime = 0;
   } else {
-    // Idle wandering
+    // Idle: slow, subtle wandering so it doesn’t feel static on touch devices
     idleTime += 0.016;
     const r = 0.6;
     const x = Math.cos(idleTime * 0.6) * r;
@@ -290,8 +290,8 @@ function animate() {
     target = new THREE.Vector3(x, y, 0);
   }
 
-  lookAtPointForEye(leftEye, target);
-  lookAtPointForEye(rightEye, target);
+  lookAtPointForEye(leftEye, leftPupil, target);
+  lookAtPointForEye(rightEye, rightPupil, target);
 
   renderer.render(scene, camera);
 }
