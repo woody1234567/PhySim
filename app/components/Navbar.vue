@@ -50,6 +50,9 @@
           </details>
         </li>
         <li>
+          <nuxt-link to="/EyeTest">Eye Test</nuxt-link>
+        </li>
+        <li>
           <nuxt-link to="/about">Contact me</nuxt-link>
         </li>
       </ul>

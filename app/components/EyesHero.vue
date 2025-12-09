@@ -58,70 +58,119 @@ let idleTime = 0;
 const EYE_RADIUS = 0.6;
 const PUPIL_RADIUS = 0.18;
 const IRIS_RADIUS = 0.28;
-// Max pupil offset from center so it never leaves the sclera
-const MAX_OFFSET = IRIS_RADIUS - PUPIL_RADIUS - 0.06;
+// Max pupil offset angle (approx) to keep it inside iris
+// Linear max offset was ~0.04. Radius ~0.6. Angle ~ 0.04/0.6 = 0.067 rad.
+// We can tweak this value to match the visual feel.
+const MAX_ROTATION = 0.2;
 
 function buildEye(): { group: THREE.Group; pupil: THREE.Mesh } {
   const group = new THREE.Group();
 
-  // Sclera (white)
+  // 1. Sclera (White Sphere)
   const scleraGeo = new THREE.SphereGeometry(EYE_RADIUS, 48, 48);
   const scleraMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    roughness: 0.35,
+    roughness: 0.25, // slightly glossier
     metalness: 0.0,
-    transmission: 0, // opaque
+    transmission: 0,
     reflectivity: 0.2,
   });
   const sclera = new THREE.Mesh(scleraGeo, scleraMat);
   group.add(sclera);
 
-  // Slight cornea bulge (subtle specular)
-  const corneaGeo = new THREE.SphereGeometry(EYE_RADIUS * 1.01, 48, 48);
+  // 2. Cornea (Clear bulged sphere over everything)
+  // Make it large enough to cover the iris/pupil layers
+  const corneaRadius = EYE_RADIUS + 0.03; // 0.63
+  const corneaGeo = new THREE.SphereGeometry(corneaRadius, 48, 48);
   const corneaMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     roughness: 0.05,
     metalness: 0,
+    transmission: 0.95, // more transparent
     transparent: true,
-    opacity: 0.25,
+    opacity: 0.3,
     ior: 1.38,
+    thickness: 0.02,
   });
   const cornea = new THREE.Mesh(corneaGeo, corneaMat);
   group.add(cornea);
 
-  // Iris (disk sitting slightly above sclera)
-  const irisGeo = new THREE.CircleGeometry(IRIS_RADIUS, 48);
+  // Helper to create spherical caps facing +Z
+  // Default SphereGeometry creates a cap at +Y (phiStart=0, phiLen=2PI, thetaStart=0, thetaLen=angle).
+  // We rotate the geometry X by -PI/2 to face +Z.
+  const createCapGeo = (radius: number, capRadius: number) => {
+    // thetaLength = asin(capRadius / radius)
+    const theta = Math.asin(capRadius / radius);
+    const geo = new THREE.SphereGeometry(
+      radius,
+      32,
+      32,
+      0,
+      Math.PI * 2,
+      0,
+      theta
+    );
+    geo.rotateX(Math.PI / 2); // Rotate +Y to +Z ? No, +Y is up. +Z is forward. Rotate X 90 degrees?
+    // +Y axis rotated by +90 deg around X axis -> +Z axis.
+    return geo;
+  };
+
+  // 3. Iris (Colored Cap)
+  // Layer it slightly above sclera
+  const irisSphereRadius = EYE_RADIUS + 0.01;
+  const irisGeo = createCapGeo(irisSphereRadius, IRIS_RADIUS);
   const irisMat = new THREE.MeshStandardMaterial({
-    color: 0x3a6ea5, // blue iris; feel free to tweak
-    roughness: 0.6,
+    color: 0x3a6ea5,
+    roughness: 0.4,
     metalness: 0.0,
   });
   const iris = new THREE.Mesh(irisGeo, irisMat);
-  iris.position.z = EYE_RADIUS + 0.01;
   group.add(iris);
 
-  // Pupil (circle on top of iris, we will move this mesh)
-  const pupilGeo = new THREE.CircleGeometry(PUPIL_RADIUS, 48);
-  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  const pupil = new THREE.Mesh(pupilGeo, pupilMat);
-  pupil.position.z = iris.position.z + 0.005;
-  group.add(pupil);
+  // 4. Occlusion Ring (Dark Band around Iris edge)
+  // We can make a slightly larger cap with a hole? No, just a slightly larger black cap underneath?
+  // Or a ring texture? Let's use a slightly larger cap behind the iris but larger radius?
+  // Actually, original was a "RingGeometry" on top.
+  // Let's make a cap that is slightly larger than Iris, black, and sit just below or above?
+  // Let's try a "Ring" implementation using a spherical band.
+  // Sphere spanning from theta_inner to theta_outer.
+  const ringSphereRadius = irisSphereRadius + 0.001;
+  const thetaInner = Math.asin((IRIS_RADIUS * 0.9) / ringSphereRadius);
+  const thetaOuter = Math.asin((IRIS_RADIUS * 1.1) / ringSphereRadius);
 
-  // Soft ambient occlusion ring (fake shadow)
-  const ringGeo = new THREE.RingGeometry(
-    IRIS_RADIUS * 0.92,
-    IRIS_RADIUS * 1.2,
-    64
+  const ringGeo = new THREE.SphereGeometry(
+    ringSphereRadius,
+    32,
+    32,
+    0,
+    Math.PI * 2,
+    thetaInner,
+    thetaOuter - thetaInner
   );
+  ringGeo.rotateX(Math.PI / 2);
+
   const ringMat = new THREE.MeshBasicMaterial({
     color: 0x000000,
     transparent: true,
-    opacity: 0.12,
+    opacity: 0.15,
     side: THREE.DoubleSide,
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.position.z = iris.position.z + 0.001;
   group.add(ring);
+
+  // 5. Pupil (Black Cap)
+  // Layer above Iris
+  const pupilSphereRadius = irisSphereRadius + 0.005; // 0.615
+  const pupilGeo = createCapGeo(pupilSphereRadius, PUPIL_RADIUS);
+  const pupilMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.1,
+  });
+  const pupil = new THREE.Mesh(pupilGeo, pupilMat);
+  // Pupil is NOT added to group directly if we want to rotate it independently around center?
+  // Actually, if we add it to group, we rotate the pupil mesh itself.
+  // Since the geometry is centered at (0,0,0), rotating the mesh rotates the cap around the center.
+  group.add(pupil);
 
   return { group, pupil };
 }
@@ -130,8 +179,7 @@ function clampOffset(vec: THREE.Vector3, maxLen: number) {
   const len = Math.hypot(vec.x, vec.y);
   if (len > maxLen && len > 0) {
     const s = maxLen / len;
-    vec.x *= s;
-    vec.y *= s;
+    // function clampOffset end
   }
 }
 
@@ -232,36 +280,53 @@ function createScene(canvas: HTMLCanvasElement) {
   floor.position.z = -0.5;
   scene.add(floor);
 }
-
 function lookAtPointForEye(
   eye: THREE.Group,
   pupil: THREE.Mesh,
   target: THREE.Vector3
 ) {
-  // Convert target into the eye's local space (so we can compute local x/y offsets)
   const local = eye.worldToLocal(target.clone());
 
-  // Project onto the eye's front plane (z ~ EYE_RADIUS)
-  // We want a 2D offset on the iris plane
-  const offset = new THREE.Vector3(local.x, local.y, 0);
+  // We mapped target to local space.
+  // We want to calculate rotation angles for the pupil.
+  // local.x maps to Yaw (Rotation Y). local.y maps to Pitch (Rotation X).
+  // Note: +X is right, requires negative rotation around Y to face right?
+  // Wait, Right Hand Rule: Thumb +Y, fingers curl +Z -> +X.
+  // Rotate around +Y: +Z moves to +X. So positive rotation Y looks Right.
+  // Let's just use linear approximation for small angles.
+
+  const offset = new THREE.Vector2(local.x, local.y);
 
   // Scale down sensitivity
-  offset.multiplyScalar(0.35);
-  clampOffset(offset, MAX_OFFSET);
+  offset.multiplyScalar(0.4);
 
-  // Animate toward target (lerp for smoothness)
-  pupil.position.x = THREE.MathUtils.lerp(pupil.position.x, offset.x, 0.2);
-  pupil.position.y = THREE.MathUtils.lerp(pupil.position.y, offset.y, 0.2);
+  // Clamp magnitude
+  if (offset.length() > MAX_ROTATION) {
+    offset.setLength(MAX_ROTATION);
+  }
 
-  // Slight eyeball rotation to sell the effect
+  // Animate pupil rotation
+  // We rotate the pupil MESH.
+  // Axis X rotation controls Up/Down (Y). +X rotation looks DOWN. -X rotation looks UP.
+  // Axis Y rotation controls Left/Right (X). +Y rotation looks RIGHT. -Y rotation looks LEFT.
+  // Target Y > 0 (Up) -> Need Negative X rotation.
+  // Target X > 0 (Right) -> Need Positive Y rotation.
+
+  const targetRotX = -offset.y;
+  const targetRotY = offset.x;
+
+  pupil.rotation.x = THREE.MathUtils.lerp(pupil.rotation.x, targetRotX, 0.2);
+  pupil.rotation.y = THREE.MathUtils.lerp(pupil.rotation.y, targetRotY, 0.2);
+
+  // Slight eyeball rotation (the whole group)
   const ROT_MAX = 0.18;
   eye.rotation.y = THREE.MathUtils.clamp(
-    THREE.MathUtils.lerp(eye.rotation.y, -offset.x * 0.25, 0.18),
+    THREE.MathUtils.lerp(eye.rotation.y, offset.x * 0.5, 0.18),
     -ROT_MAX,
     ROT_MAX
   );
   eye.rotation.x = THREE.MathUtils.clamp(
-    THREE.MathUtils.lerp(eye.rotation.x, offset.y * 0.25, 0.18),
+    THREE.MathUtils.lerp(eye.rotation.x, -offset.y * 0.5, 0.18),
     -ROT_MAX,
     ROT_MAX
   );
@@ -330,7 +395,7 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange);
 
   // Dispose
-  scene?.traverse((obj) => {
+  scene?.traverse((obj: any) => {
     if ((obj as THREE.Mesh).geometry) (obj as THREE.Mesh).geometry.dispose?.();
     const mat = (obj as THREE.Mesh).material;
     if (Array.isArray(mat)) mat.forEach((m) => m.dispose?.());
