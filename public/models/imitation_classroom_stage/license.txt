@@ -1,0 +1,11 @@
+Model Information:
+* title:	Imitation classroom stage
+* source:	https://sketchfab.com/3d-models/imitation-classroom-stage-b2a393020cee4f54b61cca70ea95ac35
+* author:	NewDOF (https://sketchfab.com/dof_new)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Imitation classroom stage" (https://sketchfab.com/3d-models/imitation-classroom-stage-b2a393020cee4f54b61cca70ea95ac35) by NewDOF (https://sketchfab.com/dof_new) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

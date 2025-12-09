@@ -55,15 +55,29 @@ const hitPoint = new THREE.Vector3();
 let isPointerActive = false;
 let idleTime = 0;
 
-// Eyeball/pupil sizing
-const EYE_RADIUS = 0.6;
-const PUPIL_RADIUS = 0.18;
-const IRIS_RADIUS = 0.28;
-// Max pupil offset angle (approx) to keep it inside iris
-// Linear max offset was ~0.04. Radius ~0.6. Angle ~ 0.04/0.6 = 0.067 rad.
-// We can tweak this value to match the visual feel.
+// Eyeball/pupil sizing helpers
+// These values control the relative sizes of the eye components.
+const EYE_RADIUS = 0.6; // Radius of the main eyeball sphere
+const PUPIL_RADIUS = 0.18; // Radius of the pupil (black center)
+const IRIS_RADIUS = 0.28; // Radius of the iris (colored part)
+
+// MAX_ROTATION clamps the pupil's movement to ensure it stays within the eye's bounds
+// and doesn't rotate too far off the iris surface.
+// Angle ~ 0.04/0.6 = 0.067 rad (approx linear calculation).
+// Tweaked to 0.2 to allow natural looking range without clipping.
 const MAX_ROTATION = 0.2;
 
+/**
+ * buildEye
+ * Constructs a complex eye group with layers for realism:
+ * 1. Sclera: The white outer sphere.
+ * 2. Cornea: A slightly larger, transparent sphere with high specular reflection.
+ * 3. Iris: A spherical cap (curved disk) representing the colored eye part.
+ * 4. Pupil: A smaller spherical cap sitting on the iris.
+ * 5. Occlusion Ring: A subtle shadow ring around the iris edge.
+ *
+ * All components are "conformal" - they follow the curve of the main sphere.
+ */
 function buildEye(): { group: THREE.Group; pupil: THREE.Mesh } {
   const group = new THREE.Group();
 
@@ -96,23 +110,28 @@ function buildEye(): { group: THREE.Group; pupil: THREE.Mesh } {
   const cornea = new THREE.Mesh(corneaGeo, corneaMat);
   group.add(cornea);
 
-  // Helper to create spherical caps facing +Z
-  // Default SphereGeometry creates a cap at +Y (phiStart=0, phiLen=2PI, thetaStart=0, thetaLen=angle).
-  // We rotate the geometry X by -PI/2 to face +Z.
+  // Helper to create spherical caps (curved disks) facing +Z.
+  // Standard SphereGeometry creates a sphere. By using phi/theta start/lengths,
+  // we can create just a "cap" (slice) of the sphere.
+  //
+  // capRadius: The radius of the circular opening of the cap (2D radius of iris/pupil).
+  // radius: The radius of the underlying sphere (EYE_RADIUS + layer offset).
   const createCapGeo = (radius: number, capRadius: number) => {
-    // thetaLength = asin(capRadius / radius)
+    // Calculat theta angle needed to create a cap of specific 2D radius
+    // sin(theta) = opposite/hypotenuse = capRadius/radius
     const theta = Math.asin(capRadius / radius);
     const geo = new THREE.SphereGeometry(
       radius,
       32,
       32,
       0,
-      Math.PI * 2,
+      Math.PI * 2, // phiLength (full circle around Y)
       0,
-      theta
+      theta // thetaLength (arc down from North Pole)
     );
-    geo.rotateX(Math.PI / 2); // Rotate +Y to +Z ? No, +Y is up. +Z is forward. Rotate X 90 degrees?
-    // +Y axis rotated by +90 deg around X axis -> +Z axis.
+    // Rotate the cap so it faces the front (+Z) instead of Up (+Y)
+    geo.rotateX(Math.PI / 2); // North pole points to +Z
+    geo.rotateY(-Math.PI / 2); // Correct orientation if needed for texture mapping
     return geo;
   };
 
@@ -239,7 +258,8 @@ function createScene(canvas: HTMLCanvasElement) {
   rim.position.set(-4, 2, -2);
   scene.add(rim);
 
-  // Load Robot Model
+  // Load Robot Model asynchronously
+  // The logic inside handles setup once the model is loaded.
   const loader = new GLTFLoader();
   loader.load("/models/robot/scene.gltf", (gltf: any) => {
     robotModel = gltf.scene;
@@ -280,7 +300,19 @@ function createScene(canvas: HTMLCanvasElement) {
     }
   });
 
+  // Load Classroom Stage Model
+  loader.load("/models/imitation_classroom_stage/scene.gltf", (gltf: any) => {
+    const classroomModel = gltf.scene;
+    // Scale and position the classroom to be a background
+    // These values might need adjustment based on the actual model scale
+    classroomModel.scale.set(2, 2, 2);
+    classroomModel.position.set(0, -5, -5);
+    scene.add(classroomModel);
+  });
+
   // Soft floor to ground the scene visually
+  // (Optional: we can keep or remove the floor if the classroom has one,
+  // but let's keep it for now or make it more transparent if needed)
   const floorGeo = new THREE.CircleGeometry(6, 64);
   const floorMat = new THREE.MeshBasicMaterial({
     color: 0x000000,
@@ -294,6 +326,14 @@ function createScene(canvas: HTMLCanvasElement) {
   scene.add(floor);
 }
 
+/**
+ * lookAtPointForEye
+ * Calculates rotation for the pupil and the eye group to track a target point.
+ *
+ * @param eye - The entire eye group (contains sclera, iris, pupil etc)
+ * @param pupil - The pupil mesh (child of eye group)
+ * @param target - 3D point in world space to look at
+ */
 function lookAtPointForEye(
   eye: THREE.Group,
   pupil: THREE.Mesh,
@@ -333,7 +373,7 @@ function lookAtPointForEye(
   pupil.rotation.y = THREE.MathUtils.lerp(pupil.rotation.y, targetRotY, 0.2);
 
   // Slight eyeball rotation (the whole group)
-  const ROT_MAX = 0.18;
+  const ROT_MAX = 0.5;
   eye.rotation.y = THREE.MathUtils.clamp(
     THREE.MathUtils.lerp(eye.rotation.y, offset.x * 0.5, 0.18),
     -ROT_MAX,
@@ -346,6 +386,10 @@ function lookAtPointForEye(
   );
 }
 
+/**
+ * animate
+ * Main render loop. Handles interaction and physics simulation logic.
+ */
 function animate() {
   animationId = requestAnimationFrame(animate);
 
@@ -370,24 +414,29 @@ function animate() {
     );
   }
 
+  // Ensure eyes exist before trying to move them
   if (!leftEye || !rightEye) return;
 
-  // Determine a 3D target point on z=0 plane
+  // Determine where to look
+  // raycaster + planeZ calculates where the mouse ray hits the Z=0 plane (screen depth)
   let target: THREE.Vector3;
   if (isPointerActive) {
     raycaster.setFromCamera(mouseNDC, camera);
     raycaster.ray.intersectPlane(planeZ, hitPoint);
     target = hitPoint;
-    idleTime = 0;
+    idleTime = 0; // Reset idle timer when user is active
   } else {
-    // Idle: slow, subtle wandering so it doesn’t feel static on touch devices
+    // Idle Animation:
+    // If user interacts, pupil tracks mouse.
+    // If idle, pupil wanders slowly in a small figure-8 or circle to feel alive.
     idleTime += 0.016;
-    const r = 0.6;
+    const r = 0.6; // radius of wandering
     const x = Math.cos(idleTime * 0.6) * r;
     const y = Math.sin(idleTime * 0.9) * r * 0.6;
     target = new THREE.Vector3(x, y, 0);
   }
 
+  // Update both eyes to look at the calculated target
   lookAtPointForEye(leftEye, leftPupil, target);
   lookAtPointForEye(rightEye, rightPupil, target);
 
