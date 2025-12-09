@@ -267,7 +267,7 @@ function createScene(canvas: HTMLCanvasElement) {
     // robotModel.scale.set(1.5, 1.5, 1.5);
     if (robotModel) {
       robotModel.position.y = -2; // Move down to center the face
-      robotModel.rotation.y = 1.57; // Initial rotation (facing forward?)
+      robotModel.rotation.y = 0; // Initial rotation (facing forward?)
       scene.add(robotModel);
     }
 
@@ -300,16 +300,6 @@ function createScene(canvas: HTMLCanvasElement) {
     }
   });
 
-  // Load Classroom Stage Model
-  loader.load("/models/imitation_classroom_stage/scene.gltf", (gltf: any) => {
-    const classroomModel = gltf.scene;
-    // Scale and position the classroom to be a background
-    // These values might need adjustment based on the actual model scale
-    classroomModel.scale.set(2, 2, 2);
-    classroomModel.position.set(0, -5, -5);
-    scene.add(classroomModel);
-  });
-
   // Soft floor to ground the scene visually
   // (Optional: we can keep or remove the floor if the classroom has one,
   // but let's keep it for now or make it more transparent if needed)
@@ -324,6 +314,14 @@ function createScene(canvas: HTMLCanvasElement) {
   floor.position.y = -2.0; // aligned with robot feet
   floor.position.z = -0.5;
   scene.add(floor);
+
+  // Grid Helper
+  const gridHelper = new THREE.GridHelper(20, 20);
+  gridHelper.position.y = -2.0;
+  scene.add(gridHelper);
+
+  const axesHelper = new THREE.AxesHelper(5);
+  scene.add(axesHelper);
 }
 
 /**
@@ -366,21 +364,21 @@ function lookAtPointForEye(
   // Target Y > 0 (Up) -> Need Negative X rotation.
   // Target X > 0 (Right) -> Need Positive Y rotation.
 
-  const targetRotX = -offset.y;
-  const targetRotY = offset.x;
+  const targetRotX = target.y > 0 ? -offset.y : offset.y;
+  const targetRotY = target.x > 0 ? -offset.x : offset.x;
 
   pupil.rotation.x = THREE.MathUtils.lerp(pupil.rotation.x, targetRotX, 0.2);
   pupil.rotation.y = THREE.MathUtils.lerp(pupil.rotation.y, targetRotY, 0.2);
 
   // Slight eyeball rotation (the whole group)
-  const ROT_MAX = 0.5;
+  const ROT_MAX = 1;
   eye.rotation.y = THREE.MathUtils.clamp(
     THREE.MathUtils.lerp(eye.rotation.y, offset.x * 0.5, 0.18),
     -ROT_MAX,
     ROT_MAX
   );
   eye.rotation.x = THREE.MathUtils.clamp(
-    THREE.MathUtils.lerp(eye.rotation.x, -offset.y * 0.5, 0.18),
+    THREE.MathUtils.lerp(eye.rotation.x, offset.y * 0.5, 0.18),
     -ROT_MAX,
     ROT_MAX
   );
