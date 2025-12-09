@@ -45,6 +45,7 @@ let leftPupil!: THREE.Mesh;
 let rightPupil!: THREE.Mesh;
 
 // Reusable objects
+let robotModel: THREE.Group | undefined;
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2();
 const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // z=0 plane
@@ -241,12 +242,14 @@ function createScene(canvas: HTMLCanvasElement) {
   // Load Robot Model
   const loader = new GLTFLoader();
   loader.load("/models/robot/scene.gltf", (gltf: any) => {
-    const robot = gltf.scene;
+    robotModel = gltf.scene;
     // Adjust scale and position based on typical model sizes; may need tuning
-    // robot.scale.set(1.5, 1.5, 1.5);
-    robot.position.y = -2; // Move down to center the face
-    robot.rotation.y = 1.57;
-    scene.add(robot);
+    // robotModel.scale.set(1.5, 1.5, 1.5);
+    if (robotModel) {
+      robotModel.position.y = -2; // Move down to center the face
+      robotModel.rotation.y = 1.57; // Initial rotation (facing forward?)
+      scene.add(robotModel);
+    }
 
     // Create Eyes and attach to robot or scene
     // Because the robot might have its own transforms, let's add eyes to the scene for now
@@ -260,11 +263,21 @@ function createScene(canvas: HTMLCanvasElement) {
     leftEye.scale.set(EYE_SCALE, EYE_SCALE, EYE_SCALE);
     rightEye.scale.set(EYE_SCALE, EYE_SCALE, EYE_SCALE);
 
-    // Estimated positions for the robot's eye sockets
-    leftEye.position.set(-0.7, 4.7, 1.5);
-    rightEye.position.set(0.7, 4.7, 1.5);
+    // Attach eyes to the robot model so they rotate with it
+    if (robotModel) {
+      robotModel.add(leftEye, rightEye);
 
-    scene.add(leftEye, rightEye);
+      // Calculated local positions to match previous world positions roughly
+      // World (-0.7, 4.7, 1.5) -> Local (-1.5, 6.7, -0.7)
+      // World (0.7, 4.7, 1.5) -> Local (-1.5, 6.7, 0.7)
+      leftEye.position.set(-1.5, 6.7, -0.7);
+      rightEye.position.set(-1.5, 6.7, 0.7);
+    } else {
+      // Fallback if robot model failed to load for some reason (unlikely here)
+      scene.add(leftEye, rightEye);
+      leftEye.position.set(-0.7, 4.7, 1.5);
+      rightEye.position.set(0.7, 4.7, 1.5);
+    }
   });
 
   // Soft floor to ground the scene visually
@@ -280,6 +293,7 @@ function createScene(canvas: HTMLCanvasElement) {
   floor.position.z = -0.5;
   scene.add(floor);
 }
+
 function lookAtPointForEye(
   eye: THREE.Group,
   pupil: THREE.Mesh,
@@ -336,6 +350,25 @@ function animate() {
   animationId = requestAnimationFrame(animate);
 
   if (controls) controls.update();
+
+  // Robot Body Rotation
+  if (robotModel) {
+    let targetBodyRot = 1.57; // Base rotation (PI/2)
+    if (isPointerActive) {
+      // Map mouseNDC.x (-1 to 1) to a small rotation offset
+      // e.g. -0.5 to 0.5 radians
+      const rotOffset = mouseNDC.x * 0.5;
+      targetBodyRot = 1.57 + rotOffset;
+    }
+
+    // Smoothly interpolate current rotation to target
+    // Lower factor = slower, lazier movement
+    robotModel.rotation.y = THREE.MathUtils.lerp(
+      robotModel.rotation.y,
+      targetBodyRot,
+      0.05
+    );
+  }
 
   if (!leftEye || !rightEye) return;
 
