@@ -46,6 +46,11 @@
                   >Bowl Simulation</nuxt-link
                 >
               </li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/IdealGasSimulation"
+                  >Ideal Gas Simulation</nuxt-link
+                >
+              </li>
             </ul>
           </details>
         </li>
