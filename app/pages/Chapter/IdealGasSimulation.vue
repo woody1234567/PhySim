@@ -279,7 +279,8 @@ const BOLTZMANN_K = 1.380649e-23; // Real physics constant, but scaled for simul
 const SIM_K = 1.0;
 const PARTICLE_MASS = 1.0;
 const PARTICLE_RADIUS = 0.2;
-const TIME_STEP = 1 / 60;
+const SUBSTEPS = 5;
+const TIME_STEP = 1 / 60 / SUBSTEPS;
 
 // Materials
 const wallMaterial = new CANNON.Material("wall");
@@ -585,61 +586,79 @@ const thermalize = (targetT: number) => {
   });
 };
 
+const constrainParticles = () => {
+  const halfL = boxSize.value / 2 - PARTICLE_RADIUS;
+  particles.forEach((p) => {
+    // X
+    if (p.position.x > halfL) {
+      p.position.x = halfL;
+      p.velocity.x = -Math.abs(p.velocity.x);
+    } else if (p.position.x < -halfL) {
+      p.position.x = -halfL;
+      p.velocity.x = Math.abs(p.velocity.x);
+    }
+    // Y
+    if (p.position.y > halfL) {
+      p.position.y = halfL;
+      p.velocity.y = -Math.abs(p.velocity.y);
+    } else if (p.position.y < -halfL) {
+      p.position.y = -halfL;
+      p.velocity.y = Math.abs(p.velocity.y);
+    }
+    // Z
+    if (p.position.z > halfL) {
+      p.position.z = halfL;
+      p.velocity.z = -Math.abs(p.velocity.z);
+    } else if (p.position.z < -halfL) {
+      p.position.z = -halfL;
+      p.velocity.z = Math.abs(p.velocity.z);
+    }
+  });
+};
+
 const stepSimulation = () => {
   if (isPaused.value) return;
 
   // --- Mode Specific Logic ---
+  // Apply macro-controls/thermalization once per frame (or we could do it per step, but once per frame is usually fine for these stats)
   switch (simulationMode.value) {
     case "isochoric": // Const V
-      // If user changed T slider, we need to inject energy to match T
-      // The T slider sets the target T. We enforce it.
       thermalize(temperature.value);
       break;
 
     case "isothermal": // Const T
-      // If user changes V (boxSize), T might change due to work done?
-      // In ideal gas sim, simple resizing usually doesn't change v immediately unless hitting moving wall.
-      // But we define Isothermal as "Keep T constant".
-      // So we just enforce T every frame.
       thermalize(temperature.value);
       break;
 
     case "isobaric": // Const P
-      // Adjust Volume (boxSize) to match targetPressure.
-      // If P_internal > Target, Expand.
-      // If P_internal < Target, Contract.
-      // Simple P-controller for boxSize
       const P_diff = currentPressure.value - targetPressure.value;
       const k_vol = 0.0005; // gain
 
       let newSize = boxSize.value + P_diff * k_vol;
       newSize = Math.max(5, Math.min(25, newSize)); // Clamp
 
-      boxSize.value = newSize; // This moves walls
+      boxSize.value = newSize;
       updateWallPositions();
-
-      // In pure isobaric, usually T changes results in V change.
-      // We assume T is environmentally controlled or free?
-      // Spec: "Pressure maintained by dynamically adjusting container volume."
-      // "Volume responds to changes in particle kinetic energy."
-      // This implies we don't force T, we let T evolve or be set, and V adapts.
-      // If user changes T slider, particles speed up -> P goes up -> V expands -> P returns to target.
-      thermalize(temperature.value); // We drive T, V responds.
+      thermalize(temperature.value);
       break;
     case "free":
     default:
-      // Just let physics run. T might drift if numerical errors, but mostly const E.
-      thermalize(temperature.value); // Enforce T slider
+      thermalize(temperature.value);
       break;
   }
 
-  world.fixedStep();
-  simTime += TIME_STEP;
+  // physics sub-steps
+  for (let i = 0; i < SUBSTEPS; i++) {
+    world.step(TIME_STEP);
+    constrainParticles();
+  }
+
+  simTime += TIME_STEP * SUBSTEPS;
 
   updateMeasuredStats();
 
   // Log Data every 10 frames (~6 times per sec)
-  if (world.fixedStep && Math.floor(simTime / TIME_STEP) % 10 === 0) {
+  if (Math.floor(simTime / (TIME_STEP * SUBSTEPS)) % 10 === 0) {
     logData();
   }
 };
