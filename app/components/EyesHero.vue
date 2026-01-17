@@ -315,13 +315,14 @@ function createScene(canvas: HTMLCanvasElement) {
   floor.position.z = -0.5;
   scene.add(floor);
 
-  // Grid Helper
-  const gridHelper = new THREE.GridHelper(20, 20);
-  gridHelper.position.y = -2.0;
-  scene.add(gridHelper);
+  // // Grid Helper
+  // const gridHelper = new THREE.GridHelper(20, 20);
+  // gridHelper.position.y = -2.0;
+  // scene.add(gridHelper);
 
-  const axesHelper = new THREE.AxesHelper(5);
-  scene.add(axesHelper);
+  // // axis helper
+  // const axesHelper = new THREE.AxesHelper(5);
+  // scene.add(axesHelper);
 }
 
 /**
@@ -371,7 +372,7 @@ function lookAtPointForEye(
   pupil.rotation.y = THREE.MathUtils.lerp(pupil.rotation.y, targetRotY, 0.2);
 
   // Slight eyeball rotation (the whole group)
-  const ROT_MAX = 1;
+  const ROT_MAX = 0.5;
   eye.rotation.y = THREE.MathUtils.clamp(
     THREE.MathUtils.lerp(eye.rotation.y, offset.x * 0.5, 0.18),
     -ROT_MAX,
