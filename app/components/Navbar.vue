@@ -51,6 +51,11 @@
                   >Ideal Gas Simulation</nuxt-link
                 >
               </li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/collision"
+                  >Collision</nuxt-link
+                >
+              </li>
             </ul>
           </details>
         </li>
