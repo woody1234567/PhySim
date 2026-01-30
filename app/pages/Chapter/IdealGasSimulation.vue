@@ -18,7 +18,6 @@
       >
         <h2 class="font-bold">Ideal Gas Simulation</h2>
         <p class="text-xs">Particles: {{ particleCount }}</p>
-        <p class="text-xs">Mode: {{ simulationMode }}</p>
       </div>
     </div>
 
@@ -62,23 +61,6 @@
 
           <div class="divider my-0"></div>
 
-          <!-- Mode Selection -->
-          <div class="form-control">
-            <label class="label"
-              ><span class="label-text font-bold">Simulation Mode</span></label
-            >
-            <select
-              class="select select-bordered select-sm w-full"
-              v-model="simulationMode"
-              @change="onModeChange"
-            >
-              <option value="free">Free Mode</option>
-              <option value="isochoric">Isochoric (Const V)</option>
-              <option value="isobaric">Isobaric (Const P)</option>
-              <option value="isothermal">Isothermal (Const T)</option>
-            </select>
-          </div>
-
           <!-- Parameters -->
           <!-- Temperature (T) -->
           <div class="form-control">
@@ -93,7 +75,6 @@
               step="10"
               class="range range-xs range-error"
               v-model.number="temperature"
-              :disabled="simulationMode === 'isothermal'"
               @input="onTemperatureChange"
             />
           </div>
@@ -111,7 +92,6 @@
               step="0.5"
               class="range range-xs range-info"
               v-model.number="boxSize"
-              :disabled="simulationMode === 'isochoric'"
               @input="onVolumeChange"
             />
             <div class="text-xs text-center mt-1 text-base-content/60">
@@ -133,27 +113,6 @@
               class="range range-xs range-success"
               v-model.number="particleCount"
               @change="resetSimulation"
-            />
-          </div>
-
-          <!-- Target Pressure (for Isobaric) -->
-          <div
-            v-if="simulationMode === 'isobaric'"
-            class="form-control bg-base-200 p-2 rounded-lg"
-          >
-            <label class="label">
-              <span class="label-text text-warning">Target Pressure</span>
-              <span class="label-text-alt"
-                >{{ targetPressure.toFixed(1) }} Pa</span
-              >
-            </label>
-            <input
-              type="range"
-              min="10"
-              max="1000"
-              step="10"
-              class="range range-xs range-warning"
-              v-model.number="targetPressure"
             />
           </div>
         </div>
@@ -271,7 +230,6 @@ import Chart from "chart.js/auto";
 import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 
 // --- Types & Constants ---
-type SimulationMode = "free" | "isochoric" | "isobaric" | "isothermal";
 
 // Physics Constants
 const BOLTZMANN_K = 1.380649e-23; // Real physics constant, but scaled for simulation visual
@@ -306,16 +264,14 @@ const chartCanvas = ref<HTMLCanvasElement | null>(null);
 const temperature = ref(300); // Kelvin (simulated)
 const boxSize = ref(10); // Length of side of cube
 const particleCount = ref(100);
-const targetPressure = ref(300); // For Isobaric mode
-const simulationMode = ref<SimulationMode>("free");
+
 const isPaused = ref(false);
 
 // --- Simulation Metrics ---
 const currentPressure = ref(0);
 const currentTemperature = ref(0);
 const totalKineticEnergy = ref(0);
-const accumulatedImpulse = ref(0);
-const impulseFrames = ref(0); // For averaging pressure
+
 const pv_nrt = computed(() => {
   // PV = nRT check
   // P = currentPressure
@@ -446,23 +402,6 @@ const initPhysics = () => {
     wallBody.addShape(new CANNON.Plane());
     world.addBody(wallBody);
     wallBodies.push(wallBody);
-
-    // Listen for collisions to measure pressure
-    wallBody.addEventListener("collide", (e: any) => {
-      // Impulse = change in momentum. e.contact.getImpactVelocityAlongNormal() gives relative vel
-      // For elastic collision with static wall: dP = 2 * m * v_normal
-      const contactNormal = new CANNON.Vec3();
-      e.contact.ni.copy(contactNormal);
-      if (e.body === wallBody) contactNormal.negate(); // Point into gas
-
-      // Approximate impulse Magnitude
-      // Cannon.js doesn't expose impulse directly easily in event, but we know it's elastic
-      // Impact velocity * mass * (1 + restitution)
-      // v_rel is relative velocity.
-      const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
-      const impulse = v * PARTICLE_MASS * (1 + 1.0); // 2mv
-      accumulatedImpulse.value += impulse;
-    });
   }
 };
 
@@ -516,8 +455,6 @@ const resetSimulation = () => {
   particles = [];
   logs.value = [];
   simTime = 0;
-  accumulatedImpulse.value = 0;
-  //impulseFrames.value = 0; // Don't reset rolling avg completely or it jumps, but here we restart so ok.
 
   // Re-create particles
   const geom = new THREE.SphereGeometry(PARTICLE_RADIUS, 8, 8);
@@ -620,32 +557,8 @@ const stepSimulation = () => {
   if (isPaused.value) return;
 
   // --- Mode Specific Logic ---
-  // Apply macro-controls/thermalization once per frame (or we could do it per step, but once per frame is usually fine for these stats)
-  switch (simulationMode.value) {
-    case "isochoric": // Const V
-      thermalize(temperature.value);
-      break;
-
-    case "isothermal": // Const T
-      thermalize(temperature.value);
-      break;
-
-    case "isobaric": // Const P
-      const P_diff = currentPressure.value - targetPressure.value;
-      const k_vol = 0.0005; // gain
-
-      let newSize = boxSize.value + P_diff * k_vol;
-      newSize = Math.max(5, Math.min(25, newSize)); // Clamp
-
-      boxSize.value = newSize;
-      updateWallPositions();
-      thermalize(temperature.value);
-      break;
-    case "free":
-    default:
-      thermalize(temperature.value);
-      break;
-  }
+  // Thermalize to maintain T (simple thermostat)
+  thermalize(temperature.value);
 
   // physics sub-steps
   for (let i = 0; i < SUBSTEPS; i++) {
@@ -677,25 +590,15 @@ const updateMeasuredStats = () => {
   currentTemperature.value = (2 * (ke / N)) / (3 * SIM_K);
 
   // 2. Calculate Pressure
-  // Pressure = Force / Area
-  // Force = Impulse / Time
-  // We accumulate impulse in the collision event.
-  // We average over a rolling window for stability.
-  // Actually, simple way: P_inst = (AccumulatedImpulse / dt) / Area
-  // Reset accumulated impulse each frame or bunch of frames.
-
-  // Let's smooth it.
-  const smoothing = 0.95;
-  const surfaceArea = 6 * boxSize.value * boxSize.value;
-
-  // P_instant = (ImpulseThisStep / TIME_STEP) / Area
-  const instantPressure = accumulatedImpulse.value / TIME_STEP / surfaceArea;
-
-  currentPressure.value =
-    currentPressure.value * smoothing + instantPressure * (1 - smoothing);
-
-  // Reset impulse accumulator
-  accumulatedImpulse.value = 0;
+  // P = (2/3) * (E_k / V)
+  // E_k = totalKineticEnergy
+  // V = boxSize^3
+  const V = Math.pow(boxSize.value, 3);
+  if (V > 0) {
+    currentPressure.value = (2 * totalKineticEnergy.value) / (3 * V);
+  } else {
+    currentPressure.value = 0;
+  }
 };
 
 const logData = () => {
@@ -735,19 +638,11 @@ const togglePause = () => {
   isPaused.value = !isPaused.value;
 };
 
-const onModeChange = () => {
-  // Reset specifics?
-  if (simulationMode.value === "isobaric") {
-    targetPressure.value = currentPressure.value; // Start from equilibrium
-  }
-};
-
 const onTemperatureChange = () => {
   // Logic handled in stepSimulation via thermalize
 };
 
 const onVolumeChange = () => {
-  if (simulationMode.value === "isochoric") return; // Should be disabled in UI
   updateWallPositions();
 };
 
