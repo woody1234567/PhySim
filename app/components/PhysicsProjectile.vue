@@ -365,7 +365,12 @@ import {
 } from "vue";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import Chart from "chart.js/auto";
+import { Chart, registerables } from "chart.js";
+
+// Register Chart.js components
+if (import.meta.client) {
+  Chart.register(...registerables);
+}
 
 // --- Types & Interfaces ---
 interface Vector3 {
@@ -465,18 +470,19 @@ const chartConfig = reactive({
   variable: "momentum",
 });
 
-// --- Three.js Variables ---
-let scene: THREE.Scene;
-let camera: THREE.PerspectiveCamera;
-let renderer: THREE.WebGLRenderer;
-let controls: OrbitControls;
-let mBody1: THREE.Mesh, mBody2: THREE.Mesh;
+// --- Three.js Variables (Shallow refs for better performance and access) ---
+const scene = shallowRef<THREE.Scene | null>(null);
+const camera = shallowRef<THREE.PerspectiveCamera | null>(null);
+const renderer = shallowRef<THREE.WebGLRenderer | null>(null);
+const controls = shallowRef<OrbitControls | null>(null);
+const mBody1 = shallowRef<THREE.Mesh | null>(null);
+const mBody2 = shallowRef<THREE.Mesh | null>(null);
 let animationFrameId: number;
 
 // --- Initialization ---
 
 onMounted(() => {
-  if (process.client) {
+  if (import.meta.client) {
     initThree();
     initChart();
     resetSimulation();
@@ -486,10 +492,10 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  if (process.client) {
+  if (import.meta.client) {
     cancelAnimationFrame(animationFrameId);
     window.removeEventListener("resize", handleResize);
-    renderer?.dispose();
+    renderer.value?.dispose();
     chartInstance?.destroy();
   }
 });
@@ -498,45 +504,48 @@ function initThree() {
   if (!canvasRef.value) return;
 
   // Scene
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x202025);
+  scene.value = new THREE.Scene();
+  scene.value.background = new THREE.Color(0x202025);
   // Grid
   const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
-  scene.add(gridHelper);
+  scene.value.add(gridHelper);
 
   // Camera
-  camera = new THREE.PerspectiveCamera(
+  camera.value = new THREE.PerspectiveCamera(
     45,
     (window.innerWidth - sidebarWidth.value) / window.innerHeight,
     0.1,
     1000,
   );
-  camera.position.set(10, 10, 20);
-  camera.lookAt(0, 0, 0);
+  camera.value.position.set(10, 10, 20);
+  camera.value.lookAt(0, 0, 0);
 
   // Renderer
-  renderer = new THREE.WebGLRenderer({
+  renderer.value = new THREE.WebGLRenderer({
     canvas: canvasRef.value,
     antialias: true,
   });
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setSize(window.innerWidth - sidebarWidth.value, window.innerHeight);
+  renderer.value.shadowMap.enabled = true;
+  renderer.value.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.value.setSize(
+    window.innerWidth - sidebarWidth.value,
+    window.innerHeight,
+  );
 
   // Controls
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
+  controls.value = new OrbitControls(camera.value, renderer.value.domElement);
+  controls.value.enableDamping = true;
 
   // Lighting
   const ambLight = new THREE.AmbientLight(0xffffff, 0.4);
-  scene.add(ambLight);
+  scene.value.add(ambLight);
 
   const dirLight = new THREE.DirectionalLight(0xffffff, 1);
   dirLight.position.set(10, 20, 10);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
   dirLight.shadow.mapSize.height = 2048;
-  scene.add(dirLight);
+  scene.value.add(dirLight);
 
   // Mesh 1 (Red)
   const geo1 = new THREE.SphereGeometry(settings.body1.radius, 32, 32);
@@ -545,10 +554,10 @@ function initThree() {
     roughness: 0.1,
     metalness: 0.1,
   });
-  mBody1 = new THREE.Mesh(geo1, mat1);
-  mBody1.castShadow = true;
-  mBody1.receiveShadow = true;
-  scene.add(mBody1);
+  mBody1.value = new THREE.Mesh(geo1, mat1);
+  mBody1.value.castShadow = true;
+  mBody1.value.receiveShadow = true;
+  scene.value.add(mBody1.value);
 
   // Mesh 2 (Blue)
   const geo2 = new THREE.SphereGeometry(settings.body2.radius, 32, 32);
@@ -557,10 +566,10 @@ function initThree() {
     roughness: 0.1,
     metalness: 0.1,
   });
-  mBody2 = new THREE.Mesh(geo2, mat2);
-  mBody2.castShadow = true;
-  mBody2.receiveShadow = true;
-  scene.add(mBody2);
+  mBody2.value = new THREE.Mesh(geo2, mat2);
+  mBody2.value.castShadow = true;
+  mBody2.value.receiveShadow = true;
+  scene.value.add(mBody2.value);
 }
 
 function resetSimulation() {
@@ -704,8 +713,10 @@ function updateVisuals() {
   const b1 = bodies.value[0];
   const b2 = bodies.value[1];
 
-  mBody1.position.set(b1.position.x, b1.position.y, b1.position.z);
-  mBody2.position.set(b2.position.x, b2.position.y, b2.position.z);
+  if (mBody1.value)
+    mBody1.value.position.set(b1.position.x, b1.position.y, b1.position.z);
+  if (mBody2.value)
+    mBody2.value.position.set(b2.position.x, b2.position.y, b2.position.z);
 }
 
 function updateDisplayData() {
@@ -769,8 +780,10 @@ function renderLoop() {
     stepSimulation();
   }
 
-  if (controls) controls.update();
-  if (renderer && scene && camera) renderer.render(scene, camera);
+  if (controls.value) controls.value.update();
+  if (renderer.value && scene.value && camera.value) {
+    renderer.value.render(scene.value, camera.value);
+  }
 }
 
 function toggleSimulation() {
@@ -778,12 +791,12 @@ function toggleSimulation() {
 }
 
 function handleResize() {
-  if (!renderer || !camera) return;
+  if (!renderer.value || !camera.value) return;
   const w = window.innerWidth - sidebarWidth.value;
   const h = window.innerHeight;
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h);
+  camera.value.aspect = w / h;
+  camera.value.updateProjectionMatrix();
+  renderer.value.setSize(w, h);
 }
 
 // --- Charting ---
