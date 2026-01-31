@@ -43,39 +43,6 @@
           <input type="radio" name="accordion" checked="checked" />
           <div class="collapse-title text-md font-medium">Control Panel</div>
           <div class="collapse-content space-y-4">
-            <!-- Surface Params -->
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text">Curvature A (x²)</span>
-                <span class="label-text-alt">{{ params.a.toFixed(3) }}</span>
-              </label>
-              <input
-                type="range"
-                min="0.01"
-                max="0.2"
-                step="0.01"
-                v-model.number="params.a"
-                class="range range-xs range-primary"
-                @change="rebuildSurface"
-              />
-            </div>
-
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text">Curvature B (y²)</span>
-                <span class="label-text-alt">{{ params.b.toFixed(3) }}</span>
-              </label>
-              <input
-                type="range"
-                min="0.01"
-                max="0.2"
-                step="0.01"
-                v-model.number="params.b"
-                class="range range-xs range-primary"
-                @change="rebuildSurface"
-              />
-            </div>
-
             <!-- Ball Params -->
             <div class="form-control w-full">
               <label class="label">
@@ -85,7 +52,7 @@
               <input
                 type="range"
                 min="1"
-                max="10"
+                max="6"
                 step="0.5"
                 v-model.number="params.startHeight"
                 class="range range-xs range-secondary"
@@ -134,9 +101,6 @@
                 Reset
               </button>
             </div>
-            <button class="btn btn-sm btn-ghost w-full" @click="rebuildSurface">
-              Rebuild Bowl
-            </button>
           </div>
         </div>
 
@@ -178,8 +142,8 @@
                     <td>{{ energies.ke.toFixed(3) }}</td>
                   </tr>
                   <tr v-if="params.frictionEnabled">
-                    <td>TE</td>
-                    <td>{{ energies.te.toFixed(3) }}</td>
+                    <td>Work</td>
+                    <td>{{ energies.workFriction.toFixed(3) }}</td>
                   </tr>
                   <tr>
                     <td>Total</td>
@@ -226,9 +190,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, reactive, watch, nextTick } from "vue";
+import { ref, onMounted, onUnmounted, reactive, nextTick } from "vue";
 import * as THREE from "three";
-import * as CANNON from "cannon-es";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import Chart from "chart.js/auto";
 
@@ -267,7 +230,7 @@ const ballState = reactive({
 const energies = reactive({
   pe: 0,
   ke: 0,
-  te: 0,
+  workFriction: 0,
   total: 0,
 });
 
@@ -283,15 +246,18 @@ let controls: OrbitControls;
 let ballMesh: THREE.Mesh;
 let surfaceMesh: THREE.Mesh;
 
-// Cannon.js Globals
-let world: CANNON.World;
-let ballBody: CANNON.Body;
-let surfaceBody: CANNON.Body;
+// Physics State (Custom)
+let simState = {
+  x: 0,
+  y: 0,
+  vx: 0,
+  vy: 0,
+};
 
 // Animation Loop
 let animationFrameId: number;
 let lastTime = 0;
-const timeStep = 1 / 60;
+const timeStep = 1 / 120; // Higher precision time step
 
 // --- Sidebar Resizing ---
 const startResize = () => {
@@ -308,10 +274,9 @@ const handleResize = (e: MouseEvent) => {
 
   sidebarWidth.value = Math.max(
     260,
-    Math.min(newWidth, Math.min(600, maxSidebar))
+    Math.min(newWidth, Math.min(600, maxSidebar)),
   );
 
-  // Trigger resize for Three.js and Chart.js
   nextTick(() => {
     onWindowResize();
   });
@@ -321,7 +286,6 @@ const handleResize = (e: MouseEvent) => {
 
 onMounted(() => {
   initThree();
-  initPhysics();
   initChart();
   resetSimulation();
   animate(0);
@@ -343,11 +307,10 @@ const initThree = () => {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x111111);
 
-  // Camera (Z-up world)
   const aspect = viewportRef.value.clientWidth / viewportRef.value.clientHeight;
   camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
   camera.position.set(10, 10, 10);
-  camera.up.set(0, 0, 1); // Z-up
+  camera.up.set(0, 0, 1);
 
   renderer = new THREE.WebGLRenderer({
     canvas: canvasRef.value,
@@ -355,14 +318,13 @@ const initThree = () => {
   });
   renderer.setSize(
     viewportRef.value.clientWidth,
-    viewportRef.value.clientHeight
+    viewportRef.value.clientHeight,
   );
   renderer.shadowMap.enabled = true;
 
   controls = new OrbitControls(camera, canvasRef.value);
   controls.enableDamping = true;
 
-  // Lighting
   const ambientLight = new THREE.AmbientLight(0x404040);
   scene.add(ambientLight);
 
@@ -371,60 +333,31 @@ const initThree = () => {
   dirLight.castShadow = true;
   scene.add(dirLight);
 
-  // Surface Mesh
-  const geometry = new THREE.PlaneGeometry(12, 12, 64, 64);
+  const geometry = new THREE.PlaneGeometry(24, 24, 128, 128);
   const material = new THREE.MeshStandardMaterial({
     color: 0x3b82f6,
     side: THREE.DoubleSide,
     wireframe: true,
   });
   surfaceMesh = new THREE.Mesh(geometry, material);
+  rebuildSurfaceMesh(); // Apply initial curvature
   scene.add(surfaceMesh);
 
-  // Ball Mesh
   const ballGeo = new THREE.SphereGeometry(params.radius, 32, 32);
   const ballMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
   ballMesh = new THREE.Mesh(ballGeo, ballMat);
   ballMesh.castShadow = true;
   scene.add(ballMesh);
 
-  // Grid Helper (XY plane)
   const gridHelper = new THREE.GridHelper(20, 20);
   gridHelper.rotation.x = Math.PI / 2;
   scene.add(gridHelper);
 };
 
-// --- Physics Setup ---
-const initPhysics = () => {
-  world = new CANNON.World();
-  world.gravity.set(0, 0, -9.8);
-
-  // Ball Body
-  const shape = new CANNON.Sphere(params.radius);
-  ballBody = new CANNON.Body({
-    mass: params.mass,
-    position: new CANNON.Vec3(0, 0, 5),
-    shape: shape,
-  });
-  world.addBody(ballBody);
-
-  // Surface Body (Heightfield)
-  rebuildSurface();
-};
-
-const rebuildSurface = () => {
-  if (!surfaceMesh || !world) return;
-
-  // 1. Update Visual Mesh
+const rebuildSurfaceMesh = () => {
+  if (!surfaceMesh) return;
   const positions = surfaceMesh.geometry.attributes.position.array;
   const count = positions.length / 3;
-  // PlaneGeometry is created in XY plane by default.
-  // We need to map it to our Z = ax^2 + by^2 function.
-  // PlaneGeometry(12, 12, 64, 64) -> x from -6 to 6, y from -6 to 6 (if centered)
-
-  // However, PlaneGeometry vertices are indexed row by row.
-  // We'll iterate and update Z based on X and Y.
-  // Note: PlaneGeometry is usually Z=0. We will modify Z.
 
   for (let i = 0; i < count; i++) {
     const x = positions[i * 3];
@@ -434,78 +367,59 @@ const rebuildSurface = () => {
   }
   surfaceMesh.geometry.attributes.position.needsUpdate = true;
   surfaceMesh.geometry.computeVertexNormals();
-
-  // 2. Update Physics Body
-  if (surfaceBody) {
-    world.removeBody(surfaceBody);
-  }
-
-  // Create Heightfield
-  // Cannon Heightfield expects data[x][y] = z
-  // We need to match the resolution of the mesh (64 segments -> 65 vertices)
-  const size = 64;
-  const matrix: number[][] = [];
-  const range = 12;
-  const step = range / size; // 12 / 64
-
-  // Cannon Heightfield origin is at (0,0,0) of local frame, extending +x, +y
-  // We need to offset it to center at (0,0) world.
-
-  for (let i = 0; i <= size; i++) {
-    matrix.push([]);
-    for (let j = 0; j <= size; j++) {
-      // Calculate world x, y for this grid point
-      // Note: Cannon's i corresponds to x, j to y
-      // But we need to be careful with orientation.
-      // Let's assume standard mapping.
-      const x = -6 + i * step;
-      const y = 6 - j * step; // Three.js PlaneGeometry UVs might be flipped, but let's stick to math
-      // Actually, let's just match the grid.
-      // x from -6 to 6
-      // y from -6 to 6
-      const wx = -6 + i * step;
-      const wy = -6 + j * step;
-      const height = params.a * wx * wx + params.b * wy * wy;
-      matrix[i].push(height);
-    }
-  }
-
-  const hfShape = new CANNON.Heightfield(matrix, {
-    elementSize: step,
-  });
-
-  surfaceBody = new CANNON.Body({ mass: 0 }); // Static
-  surfaceBody.addShape(hfShape);
-
-  // Center the heightfield
-  // It starts at 0,0. We want center at 0,0.
-  // So we move it by -6, -6.
-  surfaceBody.position.set(-6, -6, 0);
-
-  world.addBody(surfaceBody);
 };
 
-// --- Simulation Logic ---
+// --- Physics Logic (Lagrangian Dynamics) ---
+// Surface: z = ax^2 + by^2
+// Point P on surface: (x, y, ax^2+by^2)
+// Velocity V: (vx, vy, 2ax*vx + 2by*vy)
+// Speed squared V^2: vx^2 + vy^2 + (2ax*vx + 2by*vy)^2
+// PE = mgz = mg(ax^2+by^2)
+// KE = 0.5 * m * (vx^2 + vy^2 + (2ax*vx + 2by*vy)^2)
+// L = KE - PE
+// Equations of motion are derived from d/dt(dL/dv) - dL/dx = Q (generalized forces)
+
+const getSurfaceZ = (x: number, y: number) => {
+  return params.a * x * x + params.b * y * y;
+};
+
+const getSurfaceNormal = (x: number, y: number) => {
+  // f(x,y,z) = z - ax^2 - by^2 = 0
+  // Grad(f) = (-2ax, -2by, 1)
+  const nx = -2 * params.a * x;
+  const ny = -2 * params.b * y;
+  const nz = 1;
+  const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  return { x: nx / len, y: ny / len, z: nz / len };
+};
 
 const resetSimulation = () => {
   isRunning.value = false;
   simulationTime.value = 0;
-  energies.te = 0;
+  energies.workFriction = 0;
   dataLog = [];
 
-  // Reset Ball
-  ballBody.position.set(0, 5, params.startHeight); // Start slightly offset in Y to induce roll
-  ballBody.velocity.set(0, 0, 0);
-  ballBody.angularVelocity.set(0, 0, 0);
+  // Reset State: Place ball at pure energy height on Y-axis
+  // startHeight H.
+  // We want z = H.
+  // z = b*y^2 => y = sqrt(H/b)
+  // v = 0
+  const yStart = Math.sqrt(params.startHeight / params.b);
 
-  // Clear charts
+  simState = {
+    x: 0,
+    y: yStart,
+    vx: 0,
+    vy: 0,
+  };
+
+  updateStateDisplay();
+
   if (chartInstance) {
     chartInstance.data.labels = [];
     chartInstance.data.datasets.forEach((ds) => (ds.data = []));
     chartInstance.update();
   }
-
-  updateStateDisplay();
 };
 
 const toggleSimulation = () => {
@@ -515,99 +429,181 @@ const toggleSimulation = () => {
 const stepPhysics = () => {
   if (!isRunning.value) return;
 
-  // Custom Friction Step
-  if (params.frictionEnabled) {
-    applyFriction();
+  // Run multiple sub-steps for stability
+  const subSteps = 10;
+  const h = timeStep / subSteps;
+  const g = 9.8;
+
+  for (let i = 0; i < subSteps; i++) {
+    const { x, y, vx, vy } = simState;
+    const m = params.mass;
+
+    // Coefficients for Lagrangian equations
+    // z = ax^2 + by^2
+    // dz/dx = 2ax, dz/dy = 2by
+    const zx = 2 * params.a * x;
+    const zy = 2 * params.b * y;
+
+    const zxx = 2 * params.a;
+    const zyy = 2 * params.b;
+    const zxy = 0; // independent axes
+
+    // Derived from Euler-Lagrange equations for this surface
+    // M(q) * q_dd + C(q, q_d) + G(q) = Q
+    // This is complex to solve analytically for implicit integration.
+    // We will use a simplified numerical force approach projecting gravity onto tangent space.
+    // Actually, let's use the exact equations of motion for x and y.
+
+    // 1. Calculate Acceleration candidates based on Gravity
+    // F_gravity_z = -mg.
+    // We need to find x_dd and y_dd.
+    // It is easier to use Total Energy gradients or forces.
+    // Let's use the Tangent Space projection method which is robust for constraints.
+
+    // Current Position & Velocity in 3D
+    const z = getSurfaceZ(x, y);
+    const vz = zx * vx + zy * vy;
+
+    const V = new THREE.Vector3(vx, vy, vz);
+    const Pos = new THREE.Vector3(x, y, z);
+
+    // Normal Vector
+    const n = getSurfaceNormal(x, y);
+    const N = new THREE.Vector3(n.x, n.y, n.z);
+
+    // Forces
+    const F_g = new THREE.Vector3(0, 0, -m * g);
+
+    // Tangent Gravity Component
+    // F_tangent = F_g - (F_g . N) * N
+    const f_dot_n = F_g.dot(N);
+    const F_n = N.clone().multiplyScalar(f_dot_n);
+    const F_t = F_g.clone().sub(F_n);
+
+    // Centripetal/Curvature Forces (Velocity dependent)
+    // This is the tricky part with just tangent projection.
+    // A particle moving on a curved surface needs centripetal force to stay on it.
+    // However, simpler is simply to update V += F/m * dt, then Project V back to tangent plane.
+
+    // Explicit Integration with Projection
+    // 1. Apply Gravity
+    V.addScaledVector(F_g, h / m);
+
+    // 2. Friction
+    if (params.frictionEnabled) {
+      const speed = V.length();
+      if (speed > 0.0001) {
+        // Normal Force Magnitude approx mg * cos(theta) + centripetal
+        // For simplicity, let's just use the normal component of gravity we found + approximate centripetal
+        // Actually, simply: F_friction = -mu * |F_normal| * dir(V)
+        // |F_normal| approx |mg cos theta| ?
+        // Better: use the Constraint Force lambda.
+        // Simplest valid approximation for education: F_f = -mu * m * g * v_hat (simplified normal)
+        // or just viscous drag F_f = -k * V for "friction-like" energy loss.
+        // User asked for W = F.S, implies dry friction.
+        // Let's compute Normal force magnitude purely from static component for stability
+        const N_mag = Math.abs(F_n.length());
+        const F_f_mag = params.mu * N_mag;
+
+        // Apply friction opposite to velocity
+        const v_dir = V.clone().normalize();
+        const F_f = v_dir.multiplyScalar(-F_f_mag);
+
+        // Work done dW = F_f . V * dt
+        const dW = F_f_mag * speed * h; // Magnitude * distance. Work is energy LOSS.
+        energies.workFriction -= dW; // Accumulate negative work
+
+        V.addScaledVector(F_f, h / m);
+      }
+    }
+
+    // 3. Update Position
+    Pos.addScaledVector(V, h);
+
+    // 4. Constraint Enforcement (Projection)
+    // We have new x, y, z. But z must match surface(x,y).
+    // We simply reset z to surface(x,y) and re-project V to be tangent.
+    const newX = Pos.x;
+    const newY = Pos.y;
+    const newZ_surf = getSurfaceZ(newX, newY);
+
+    // Update Sim State
+    simState.x = newX;
+    simState.y = newY;
+
+    // Re-calculate Tangent for velocity projection
+    const zx_new = 2 * params.a * newX;
+    const zy_new = 2 * params.b * newY;
+    // Tangent basis vectors: T1 = (1, 0, zx), T2 = (0, 1, zy)
+    // Actual velocity vector V must be tangent.
+    // V_new = V_old projected onto plane?
+    // Or we just keep vx, vy and derive vz?
+    // If we just keep vx, vy from the 3D update, we might gain/lose energy due to discrete steps.
+    // But 3D projection is usually better.
+
+    // We already updated V in 3D. Let's strictly enforce tangency.
+    const n_new = getSurfaceNormal(newX, newY);
+    const N_new = new THREE.Vector3(n_new.x, n_new.y, n_new.z);
+
+    const v_dot_n = V.dot(N_new);
+    V.sub(N_new.multiplyScalar(v_dot_n));
+
+    // Extract vx, vy from this tangent 3D vector
+    simState.vx = V.x;
+    simState.vy = V.y;
   }
 
-  world.step(timeStep);
   simulationTime.value += timeStep;
-
   updateStateDisplay();
   logData();
 };
 
-const applyFriction = () => {
-  const v = ballBody.velocity;
-  const speed = v.length();
-
-  if (speed < 0.001) return;
-
-  // Calculate Normal Vector at current position
-  const x = ballBody.position.x;
-  const y = ballBody.position.y;
-
-  // Surface normal n = (-2ax, -2by, 1) normalized
-  const nx = -2 * params.a * x;
-  const ny = -2 * params.b * y;
-  const nz = 1;
-  const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-
-  // cos(theta) = n . k = nz / len
-  const cosTheta = nz / len;
-
-  // Friction Force Magnitude: F = mu * m * g * cos(theta)
-  const F_mag = params.mu * params.mass * 9.8 * cosTheta;
-
-  // Direction: Opposite to velocity
-  const fx = (-v.x / speed) * F_mag;
-  const fy = (-v.y / speed) * F_mag;
-  const fz = (-v.z / speed) * F_mag;
-
-  // Apply Force
-  ballBody.applyForce(new CANNON.Vec3(fx, fy, fz), ballBody.position);
-
-  // Thermal Energy Accumulation: Work = Force * distance = Force * speed * dt
-  energies.te += F_mag * speed * timeStep;
-};
-
 const updateStateDisplay = () => {
-  // Sync Mesh
-  ballMesh.position.copy(ballBody.position as any);
-  ballMesh.quaternion.copy(ballBody.quaternion as any);
+  // 1. Calculate visual position (Ball Radius Offset)
+  const { x, y } = simState;
+  const z_surf = getSurfaceZ(x, y);
+  const n = getSurfaceNormal(x, y);
 
-  // Update Reactive State
-  ballState.pos = {
-    x: ballBody.position.x,
-    y: ballBody.position.y,
-    z: ballBody.position.z,
-  };
-  ballState.vel = {
-    x: ballBody.velocity.x,
-    y: ballBody.velocity.y,
-    z: ballBody.velocity.z,
-  };
-  // Approximation of acceleration (force / mass)
-  ballState.acc = {
-    x: ballBody.force.x / params.mass,
-    y: ballBody.force.y / params.mass,
-    z: ballBody.force.z / params.mass,
-  };
+  // Ball Center = Surface Point + Radius * Normal
+  const bx = x + params.radius * n.x;
+  const by = y + params.radius * n.y;
+  const bz = z_surf + params.radius * n.z;
 
-  // Energies
-  const z = ballBody.position.z;
-  const v = ballBody.velocity.length();
+  // Visual Update
+  ballMesh.position.set(bx, by, bz);
 
-  energies.pe = params.mass * 9.8 * z;
-  energies.ke = 0.5 * params.mass * v * v;
-  energies.total = energies.pe + energies.ke + energies.te;
+  // Roll simulation (approximate)
+  // Rotate ball based on velocity? For now just position.
+
+  // 2. Physics Data
+  // Recalculate true 3D Velocity for Energy
+  const zx = 2 * params.a * x;
+  const zy = 2 * params.b * y;
+  const vz = zx * simState.vx + zy * simState.vy;
+
+  const v_sq = simState.vx ** 2 + simState.vy ** 2 + vz ** 2;
+  const speed = Math.sqrt(v_sq);
+
+  ballState.pos = { x: bx, y: by, z: bz }; // Show Center Pos
+  ballState.vel = { x: simState.vx, y: simState.vy, z: vz };
+
+  // Energy Calculation
+  // PE = m * g * z_center (actually usually defined at CM)
+  const g = 9.8;
+  energies.pe = params.mass * g * bz;
+  energies.ke = 0.5 * params.mass * v_sq;
+  energies.total = energies.pe + energies.ke;
 };
 
 const logData = () => {
   if (simulationTime.value % 0.1 < timeStep) {
-    // Log every ~0.1s
     dataLog.push({
       t: simulationTime.value.toFixed(3),
-      x: ballState.pos.x.toFixed(3),
-      y: ballState.pos.y.toFixed(3),
-      z: ballState.pos.z.toFixed(3),
-      vx: ballState.vel.x.toFixed(3),
-      vy: ballState.vel.y.toFixed(3),
-      vz: ballState.vel.z.toFixed(3),
       pe: energies.pe.toFixed(3),
       ke: energies.ke.toFixed(3),
-      te: energies.te.toFixed(3),
+      work: energies.workFriction.toFixed(3),
       total: energies.total.toFixed(3),
+      mech: (energies.total + energies.workFriction).toFixed(3), // Adjusted Total
     });
   }
 };
@@ -636,19 +632,19 @@ const initChart = () => {
           pointRadius: 0,
         },
         {
-          label: "Total",
+          label: "Total E",
           data: [],
           borderColor: "purple",
-          borderWidth: 1,
+          borderWidth: 2,
           pointRadius: 0,
         },
         {
-          label: "TE",
+          label: "Work (Frict)",
           data: [],
           borderColor: "red",
           borderWidth: 1,
           pointRadius: 0,
-          hidden: !params.frictionEnabled,
+          hidden: true,
         },
       ],
     },
@@ -668,8 +664,7 @@ const initChart = () => {
 const updateChart = () => {
   if (!chartInstance) return;
 
-  // Resample data for chart to avoid performance issues
-  const sampleRate = 5; // Take every 5th log
+  const sampleRate = 5;
   const labels = dataLog.filter((_, i) => i % sampleRate === 0).map((d) => d.t);
   const peData = dataLog
     .filter((_, i) => i % sampleRate === 0)
@@ -677,25 +672,24 @@ const updateChart = () => {
   const keData = dataLog
     .filter((_, i) => i % sampleRate === 0)
     .map((d) => d.ke);
-  const teData = dataLog
-    .filter((_, i) => i % sampleRate === 0)
-    .map((d) => d.te);
   const totalData = dataLog
     .filter((_, i) => i % sampleRate === 0)
     .map((d) => d.total);
+  const workData = dataLog
+    .filter((_, i) => i % sampleRate === 0)
+    .map((d) => d.work);
 
   chartInstance.data.labels = labels;
   chartInstance.data.datasets[0].data = peData;
   chartInstance.data.datasets[1].data = keData;
   chartInstance.data.datasets[2].data = totalData;
-  chartInstance.data.datasets[3].data = teData;
+  chartInstance.data.datasets[3].data = workData;
   chartInstance.data.datasets[3].hidden = !params.frictionEnabled;
 
   chartInstance.update();
 };
 
-// --- Export ---
-const exportCSV = () => {
+const exportChartCSV = () => {
   const headers = Object.keys(dataLog[0] || {}).join(",");
   const rows = dataLog.map((row) => Object.values(row).join(","));
   const csvContent =
@@ -703,14 +697,10 @@ const exportCSV = () => {
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "simulation_data.csv");
+  link.setAttribute("download", "energy_data.csv");
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-};
-
-const exportChartCSV = () => {
-  exportCSV(); // Same data
 };
 
 // --- Animation Loop ---
