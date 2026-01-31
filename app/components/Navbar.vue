@@ -56,6 +56,11 @@
                   >Collision</nuxt-link
                 >
               </li>
+              <li>
+                <nuxt-link class="btn" to="/Chapter/Buoyancy"
+                  >Buoyancy</nuxt-link
+                >
+              </li>
             </ul>
           </details>
         </li>
