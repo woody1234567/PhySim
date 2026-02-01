@@ -38,7 +38,7 @@
 
       <!-- Right: Sidebar -->
       <div
-        class="absolute top-0 right-0 bottom-0 bg-base-100 flex flex-col border-l border-base-content/10 shadow-xl z-40"
+        class="absolute top-0 right-0 bottom-0 bg-base-100 flex flex-col border-l border-base-content/10 shadow-xl z-10"
         :style="{ width: sidebarWidth + 'px' }"
       >
         <div

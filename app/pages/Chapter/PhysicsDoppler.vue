@@ -26,7 +26,7 @@
 
     <!-- Resizer Handle -->
     <div
-      class="w-2 bg-base-300 hover:bg-primary cursor-col-resize flex items-center justify-center transition-colors z-50"
+      class="w-2 bg-base-300 hover:bg-primary cursor-col-resize flex items-center justify-center transition-colors z-10"
       @mousedown="handleMouseDown"
     >
       <div class="w-1 h-8 bg-base-content/20 rounded-full"></div>
@@ -34,7 +34,7 @@
 
     <!-- Sidebar -->
     <div
-      class="flex flex-col bg-base-200 border-l border-base-300 shadow-xl z-40"
+      class="flex flex-col bg-base-200 border-l border-base-300 shadow-xl z-10"
       :style="{ width: sidebarWidth + 'px', minWidth: '260px' }"
     >
       <div
@@ -201,7 +201,7 @@ const receiverPos = reactive({ x: 0, y: 0, z: 0 }); // Fixed receiver at x=100
 const observedFreq = ref<number | null>(null);
 const logs = ref<any[]>([]);
 const waves = ref<{ id: number; emitTime: number; emitPos: THREE.Vector3 }[]>(
-  []
+  [],
 );
 let nextWaveId = 0;
 let lastEmitTime = -1;
@@ -300,7 +300,7 @@ function initThree() {
   });
   renderer.setSize(
     canvasContainer.value.clientWidth,
-    canvasContainer.value.clientHeight
+    canvasContainer.value.clientHeight,
   );
   renderer.setPixelRatio(window.devicePixelRatio);
 
@@ -456,7 +456,7 @@ function updateWaves(dt: number) {
   const receiverVec = new THREE.Vector3(
     receiverPos.x,
     receiverPos.y,
-    receiverPos.z
+    receiverPos.z,
   );
 
   for (let i = waves.value.length - 1; i >= 0; i--) {
@@ -486,7 +486,7 @@ function updateWaves(dt: number) {
           0,
           2 * Math.PI, // aStartAngle, aEndAngle
           false, // aClockwise
-          0 // aRotation
+          0, // aRotation
         );
         const points = curve.getPoints(64);
         const geometry = new THREE.BufferGeometry().setFromPoints(points);

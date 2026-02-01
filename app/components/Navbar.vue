@@ -43,7 +43,7 @@
         <li>
           <details>
             <summary>Chapter</summary>
-            <ul class="p-2 bg-base-100 rounded-box shadow-lg min-w-max z-20">
+            <ul class="p-2 bg-base-100 rounded-box shadow-lg min-w-max z-50">
               <li v-for="chapter in chapters" :key="chapter.path">
                 <nuxt-link
                   :to="chapter.path"
