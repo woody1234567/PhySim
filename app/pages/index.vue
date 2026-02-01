@@ -66,6 +66,13 @@ const simulations = [
     image: "https://picsum.photos/seed/doppler/400/250",
     to: "/Chapter/StoppingDistanceSim",
   },
+  {
+    title: "Rutherford Scattering",
+    description:
+      "Simulate alpha particle scattering by a nucleus. Adjust impact parameter and velocity to observe Coulomb repulsion.",
+    image: "https://picsum.photos/seed/rutherford/400/250",
+    to: "/Chapter/RutherfordScattering",
+  },
 ];
 </script>
 

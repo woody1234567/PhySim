@@ -100,6 +100,16 @@ const chapters = [
   },
   { name: "Collision", path: "/Chapter/collision", icon: "lucide:zap" },
   { name: "Buoyancy", path: "/Chapter/Buoyancy", icon: "lucide:droplets" },
+  {
+    name: "Simple Harmonic Motion",
+    path: "/Chapter/SimpleHarmonicMotion",
+    icon: "lucide:waves",
+  },
+  {
+    name: "Rutherford Scattering",
+    path: "/Chapter/RutherfordScattering",
+    icon: "lucide:circle-pile",
+  },
 ];
 </script>
 
