@@ -3,20 +3,11 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
+  ssr: false,
   devtools: { enabled: true },
 
   vite: {
     plugins: [tailwindcss()],
-    optimizeDeps: {
-      include: [
-        "three",
-        "cannon-es",
-        "chart.js/auto",
-        "three/examples/jsm/loaders/GLTFLoader.js",
-        "three/examples/jsm/controls/OrbitControls.js",
-        "three/examples/jsm/objects/Water.js",
-      ],
-    },
   },
 
   css: ["./app/tailwind.css"],
