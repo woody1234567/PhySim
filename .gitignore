@@ -19,7 +19,7 @@ logs
 .idea
 
 # Agent
-.agent
+# .agent
 
 # Local env files
 .env
