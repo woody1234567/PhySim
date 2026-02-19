@@ -18,6 +18,79 @@
       >
         {{ isRunning ? "RUNNING" : "PAUSED" }} (t = {{ time.toFixed(2) }}s)
       </div>
+
+      <!-- Help Button (Top Right) -->
+      <button
+        @click="showHelpModal = true"
+        class="absolute top-4 right-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all"
+        title="Physics Explanation"
+      >
+        <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+      </button>
+
+      <!-- Physics Help Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+        <div class="modal-box max-w-2xl bg-base-100 border border-base-300 text-base-content">
+          <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+            Physics Concepts: Buoyancy & Archimedes' Principle
+          </h3>
+
+          <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+            <section>
+              <h4 class="font-bold text-lg text-secondary">1. Archimedes' Principle</h4>
+              <p>
+                Any object, wholly or partially immersed in a fluid, is buoyed up by a force equal to the weight of the fluid displaced by the object:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="F_b = \rho_f \cdot g \cdot V_{sub}" :inline="false" />
+              </div>
+              <p>
+                where <MathLatex formula="\rho_f" /> is the fluid density and <MathLatex formula="V_{sub}" /> is the submerged volume.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">2. Equations of Motion</h4>
+              <p>
+                The net vertical force on the block is determined by gravity, buoyancy, and fluid drag:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="F_{net} = F_b - F_g + F_d" :inline="false" />
+              </div>
+              <ul class="list-disc ml-6 mt-2 space-y-1">
+                <li><strong>Gravity:</strong> <MathLatex formula="F_g = m \cdot g = \rho_b \cdot V \cdot g" /></li>
+                <li><strong>Buoyancy:</strong> <MathLatex formula="F_b = \rho_f \cdot g \cdot V_{sub}" /></li>
+                <li><strong>Drag:</strong> <MathLatex formula="F_d = -c \cdot v" /> (Simplified linear drag for stability)</li>
+              </ul>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">3. Floating vs. Sinking</h4>
+              <ul class="list-disc ml-6 space-y-2">
+                <li><strong>Floating:</strong> If <MathLatex formula="\rho_b < \rho_f" />, the object will oscillate and eventually settle at a depth where <MathLatex formula="F_b = F_g" />.</li>
+                <li><strong>Sinking:</strong> If <MathLatex formula="\rho_b > \rho_f" />, the object will sink to the bottom as gravity exceeds the maximum possible buoyancy.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">4. Controls Guide</h4>
+              <ul class="list-disc ml-6 space-y-2">
+                <li><strong>Fluid Density:</strong> Adjusting this changes the magnitude of the upward buoyant force.</li>
+                <li><strong>Block Density:</strong> Adjusting this changes the weight of the object.</li>
+                <li><strong>Drag Coeff:</strong> Higher values provide more damping, helping the system reach equilibrium faster.</li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="modal-action mt-6">
+            <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button @click="showHelpModal = false">close</button>
+        </form>
+      </dialog>
     </div>
 
     <!-- Resizer Handle -->
@@ -38,22 +111,31 @@
         class="collapse collapse-arrow bg-base-100 rounded-none border-b border-base-300"
       >
         <input type="radio" name="sidebar-accordion" checked />
-        <div class="collapse-title text-xl font-medium flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-            />
-          </svg>
-          Controls
+        <div class="collapse-title text-xl font-medium flex items-center justify-between pr-12">
+          <div class="flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+              />
+            </svg>
+            <span>Controls</span>
+          </div>
+          <UButton
+            icon="i-lucide-book-open"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click.stop="showHelpModal = true"
+          />
         </div>
         <div class="collapse-content space-y-4 pt-2">
           <!-- Simulation Control Buttons -->
@@ -335,6 +417,7 @@ const chartCanvasRef = ref<HTMLCanvasElement | null>(null);
 const sidebarWidth = ref(320);
 const isRunning = ref(false);
 const time = ref(0);
+const showHelpModal = ref(true); // Auto-show on first load
 
 // Drag Resizing Logic
 const isDragging = ref(false);
@@ -435,7 +518,7 @@ function initThree() {
 
   // Scene
   scene.value = new THREE.Scene();
-  scene.value.background = new THREE.Color(0x202025); // Darker background for water contrast
+  scene.value.background = new THREE.Color(0x202025);
 
   // Camera
   camera.value = new THREE.PerspectiveCamera(
@@ -470,23 +553,17 @@ function initThree() {
   const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
   dirLight.position.set(5, 10, 5);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 1024;
-  dirLight.shadow.mapSize.height = 1024;
   scene.value.add(dirLight);
 
   // --- Water ---
   const waterGeometry = new THREE.PlaneGeometry(4, 4);
-
-  // Normalize Map Generator
-  // We'll Create a procedural noise texture for water normals
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    ctx.fillStyle = "#8080ff"; // Fallback flat normal
+    ctx.fillStyle = "#8080ff";
     ctx.fillRect(0, 0, 512, 512);
-    // Add simple noise
     for (let i = 0; i < 20000; i++) {
       ctx.fillStyle = Math.random() > 0.5 ? "#8888ff" : "#7777ff";
       ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
@@ -499,7 +576,7 @@ function initThree() {
   waterObj.value = new Water(waterGeometry, {
     textureWidth: 512,
     textureHeight: 512,
-    waterNormals: texture, // Using procedural noise
+    waterNormals: texture,
     alpha: 0.8,
     sunDirection: new THREE.Vector3(),
     sunColor: 0xffffff,
@@ -511,27 +588,22 @@ function initThree() {
   waterObj.value.rotation.x = -Math.PI / 2;
   scene.value.add(waterObj.value);
 
-  // --- Glass Container (Tank) ---
-  // Dimensions 4.1 x 3 x 4.1
+  // --- Tank ---
   const tankGeo = new THREE.BoxGeometry(4.1, 3, 4.1);
   const glassMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     metalness: 0,
     roughness: 0,
-    transmission: 0.95, // Glass-like
+    transmission: 0.95,
     transparent: true,
     opacity: 0.3,
     side: THREE.DoubleSide,
   });
-
   const tank = new THREE.Mesh(tankGeo, glassMat);
-  // Water at 0. Tank from -0.5 to -3.5 (No that puts water at top)
-  // Let's Put center at -0.5. Height 3 -> Range -2.0 to +1.0.
-  // Water at 0 is comfortably inside.
   tank.position.y = -0.5;
   scene.value.add(tank);
 
-  // --- Block Mesh ---
+  // --- Block ---
   const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
   const blockMat = new THREE.MeshStandardMaterial({
     color: 0xaa5522,
@@ -543,7 +615,7 @@ function initThree() {
   blockMesh.value.receiveShadow = true;
   scene.value.add(blockMesh.value);
 
-  // --- Helpers (Arrows) ---
+  // --- Arrows ---
   arrowFg.value = new THREE.ArrowHelper(
     new THREE.Vector3(0, -1, 0),
     new THREE.Vector3(0, 0, 0),
@@ -565,106 +637,65 @@ function resetSimulation() {
   isRunning.value = false;
   time.value = 0;
   dataLogs = [];
-
-  // Init Physics State
-  physicsState.position = settings.initialHeight; // Center y
+  physicsState.position = settings.initialHeight;
   physicsState.velocity = 0;
   physicsState.acceleration = 0;
-  physicsState.mass =
-    settings.blockDensity * (BLOCK_SIZE * BLOCK_SIZE * BLOCK_SIZE);
-
+  physicsState.mass = settings.blockDensity * (BLOCK_SIZE ** 3);
   updateVisuals();
   updateDisplayData();
 }
 
-// Custom Physics Step
 function stepSimulation() {
   const dt = 1 / 60;
-
-  // 1. Calculate Forces
-
-  // Gravity (Fg)
   const Fg = -physicsState.mass * GRAVITY;
-
-  // Buoyancy (Fb)
   const yBottom = physicsState.position - BLOCK_SIZE / 2;
   const yTop = physicsState.position + BLOCK_SIZE / 2;
-
-  // Water surface is at y=0
   let submergedFactor = 0;
-  if (yTop < 0) {
-    submergedFactor = 1;
-  } else if (yBottom > 0) {
-    submergedFactor = 0;
-  } else {
-    // Fraction submerged
-    submergedFactor = -yBottom / BLOCK_SIZE;
-  }
+  if (yTop < 0) submergedFactor = 1;
+  else if (yBottom > 0) submergedFactor = 0;
+  else submergedFactor = -yBottom / BLOCK_SIZE;
   submergedFactor = Math.max(0, Math.min(1, submergedFactor));
-
-  const Vsub = submergedFactor * BLOCK_SIZE ** 3;
+  const Vsub = submergedFactor * (BLOCK_SIZE ** 3);
   const Fb = settings.fluidDensity * GRAVITY * Vsub;
-
-  // Drag (Fd)
   const Fd = -settings.dragCoeff * physicsState.velocity;
-
-  // Net Force
   const Fnet = Fg + Fb + Fd;
-
-  // 2. Integration (Euler)
   const acc = Fnet / physicsState.mass;
   physicsState.velocity += acc * dt;
   physicsState.position += physicsState.velocity * dt;
   physicsState.acceleration = acc;
-
-  // Update Time and Display
   time.value += dt;
-
   displayData.position = physicsState.position;
   displayData.velocity = physicsState.velocity;
   displayData.fg = Math.abs(Fg);
   displayData.fb = Fb;
   displayData.fd = Fd;
   displayData.fnet = Fnet;
-
   updateVisuals();
   logData();
 }
 
 function updateDisplayData() {
-  const dt = 1 / 60;
-  // Initialize with current state
   displayData.position = physicsState.position;
   displayData.velocity = physicsState.velocity;
-  // Recalculate Force G for initial display
-  const Fg = -physicsState.mass * GRAVITY;
-  displayData.fg = Math.abs(Fg);
-  displayData.fb = 0; // Initially 0 before step
+  displayData.fg = Math.abs(-physicsState.mass * GRAVITY);
+  displayData.fb = 0;
   displayData.fd = 0;
   displayData.fnet = 0;
 }
 
 function updateVisuals() {
   if (!blockMesh.value) return;
-
-  // Update Block Position
   blockMesh.value.position.y = physicsState.position;
-
-  // Update Arrows
   if (arrowFg.value) {
     arrowFg.value.position.set(0, physicsState.position, 0);
-    // Scale length
     const fgLen = Math.min((physicsState.mass * GRAVITY) / 1000, 2) + 0.5;
     arrowFg.value.setLength(fgLen);
   }
-
   if (arrowFb.value) {
-    arrowFb.value.position.set(0.6, physicsState.position, 0); // Offset x
+    arrowFb.value.position.set(0.6, physicsState.position, 0);
     const fbLen = Math.min(displayData.fb / 1000, 2) + 0.5;
-    arrowFb.value.visible = displayData.fb > 1; // Only show if significant
-    if (arrowFb.value.visible) {
-      arrowFb.value.setLength(fbLen);
-    }
+    arrowFb.value.visible = displayData.fb > 1;
+    if (arrowFb.value.visible) arrowFb.value.setLength(fbLen);
   }
 }
 
@@ -680,63 +711,42 @@ function logData() {
   });
 }
 
-// --- Charting ---
 function initChart() {
   if (!chartCanvasRef.value) return;
   const ctx = chartCanvasRef.value.getContext("2d");
   if (!ctx) return;
-
   chartInstance = new Chart(ctx, {
     type: "line",
     data: {
       labels: [],
-      datasets: [
-        {
-          label: "Data",
-          data: [],
-          borderColor: "rgb(75, 192, 192)",
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.1,
-        },
-      ],
+      datasets: [{
+        label: "Data",
+        data: [],
+        borderColor: "rgb(75, 192, 192)",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.1,
+      }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      scales: {
-        x: {
-          title: { display: true, text: "Time (s)" },
-          ticks: { maxTicksLimit: 10 },
-        },
-      },
+      scales: { x: { title: { display: true, text: "Time (s)" }, ticks: { maxTicksLimit: 10 } } },
     },
   });
 }
 
 function updateChart() {
   if (!chartInstance) return;
-
-  // Downsample to avoid chart lag
-  const step = Math.ceil(dataLogs.length / 500);
+  const step = Math.ceil(dataLogs.length / 500) || 1;
   const plottedData = dataLogs.filter((_, i) => i % step === 0);
-
   const labels = plottedData.map((l) => l.time.toFixed(2));
   let data: number[] = [];
   let label = "";
-
-  if (chartConfig.variable === "position") {
-    data = plottedData.map((l) => l.position);
-    label = "Position (y)";
-  } else if (chartConfig.variable === "velocity") {
-    data = plottedData.map((l) => l.velocity);
-    label = "Velocity (v)";
-  } else if (chartConfig.variable === "force") {
-    data = plottedData.map((l) => l.fnet);
-    label = "Net Force";
-  }
-
+  if (chartConfig.variable === "position") { data = plottedData.map((l) => l.position); label = "Position (y)"; }
+  else if (chartConfig.variable === "velocity") { data = plottedData.map((l) => l.velocity); label = "Velocity (v)"; }
+  else if (chartConfig.variable === "force") { data = plottedData.map((l) => l.fnet); label = "Net Force"; }
   chartInstance.data.labels = labels;
   chartInstance.data.datasets[0].data = data;
   chartInstance.data.datasets[0].label = label;
@@ -746,19 +756,9 @@ function updateChart() {
 function exportCSV() {
   const headers = ["Time", "Position", "Velocity", "Fg", "Fb", "Fd", "Fnet"];
   const rows = dataLogs.map((l) =>
-    [
-      l.time.toFixed(3),
-      l.position.toFixed(3),
-      l.velocity.toFixed(3),
-      l.fg.toFixed(2),
-      l.fb.toFixed(2),
-      l.fd.toFixed(2),
-      l.fnet.toFixed(2),
-    ].join(","),
+    [l.time.toFixed(3), l.position.toFixed(3), l.velocity.toFixed(3), l.fg.toFixed(2), l.fb.toFixed(2), l.fd.toFixed(2), l.fnet.toFixed(2)].join(",")
   );
-
-  const csvContent =
-    "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+  const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
@@ -768,32 +768,17 @@ function exportCSV() {
   document.body.removeChild(link);
 }
 
-function exportChartCSV() {
-  exportCSV();
-}
+function exportChartCSV() { exportCSV(); }
 
-// --- Render Loop ---
 function renderLoop() {
   animationFrameId = requestAnimationFrame(renderLoop);
-
-  if (isRunning.value) {
-    stepSimulation();
-  }
-
-  // Animate Water
-  if (waterObj.value && waterObj.value.material.uniforms) {
-    waterObj.value.material.uniforms["time"].value += 1.0 / 60.0;
-  }
-
+  if (isRunning.value) stepSimulation();
+  if (waterObj.value && waterObj.value.material.uniforms) waterObj.value.material.uniforms["time"].value += 1.0 / 60.0;
   if (controls.value) controls.value.update();
-  if (renderer.value && scene.value && camera.value) {
-    renderer.value.render(scene.value, camera.value);
-  }
+  if (renderer.value && scene.value && camera.value) renderer.value.render(scene.value, camera.value);
 }
 
-function toggleSimulation() {
-  isRunning.value = !isRunning.value;
-}
+function toggleSimulation() { isRunning.value = !isRunning.value; }
 
 function handleResize() {
   if (!renderer.value || !camera.value) return;
@@ -805,6 +790,4 @@ function handleResize() {
 }
 </script>
 
-<style scoped>
-/* Scoped styles if needed, mostly using Tailwind/DaisyUI */
-</style>
+<style scoped></style>
