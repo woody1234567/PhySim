@@ -21,6 +21,67 @@
         <p>Time: {{ currentTime.toFixed(2) }} s</p>
         <p>Distance from Start: {{ currentDistance.toFixed(2) }} m</p>
       </div>
+
+      <!-- Help Button (Top Right) -->
+      <button
+        @click="showHelpModal = true"
+        class="absolute top-4 right-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all"
+        title="Physics Explanation"
+      >
+        <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+      </button>
+
+      <!-- Physics Help Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+        <div class="modal-box max-w-2xl bg-base-100 border border-base-300">
+          <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <NuxtIcon name="heroicons:academic-cap" class="text-primary" />
+            Physics Concepts: Inclined Plane
+          </h3>
+
+          <div class="space-y-4 text-sm leading-relaxed">
+            <section>
+              <h4 class="font-bold text-lg text-secondary">1. Dynamic Forces</h4>
+              <p>
+                When an object is on an inclined plane, gravity is decomposed into two components:
+              </p>
+              <ul class="list-disc ml-6 mt-2 space-y-1">
+                <li><strong>Parallel component ($F_x$):</strong> $m \cdot g \cdot \sin(\theta)$ - drives the motion down the slope.</li>
+                <li><strong>Perpendicular component ($F_y$):</strong> $m \cdot g \cdot \cos(\theta)$ - pushes against the surface.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">2. Friction and Acceleration</h4>
+              <p>
+                The net acceleration ($a$) is determined by the balance between the parallel gravity component and the kinetic friction force ($f_k = \mu \cdot N = \mu \cdot m \cdot g \cdot \cos(\theta)$):
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                a = g · (sin(θ) - μ · cos(θ))
+              </div>
+              <p>
+                If $\tan(\theta) \le \mu$, the static friction will prevent the object from sliding initially.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">3. Controls Guide</h4>
+              <ul class="list-disc ml-6 space-y-2">
+                <li><strong>Incline Angle:</strong> Increases the parallel force, leading to higher acceleration.</li>
+                <li><strong>Friction Coeff (μ):</strong> Higher values resist motion more strongly.</li>
+                <li><strong>Mass:</strong> In a vacuum (without air resistance), mass cancels out in the acceleration formula, meaning objects of different weights fall at the same rate!</li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="modal-action mt-6">
+            <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button @click="showHelpModal = false">close</button>
+        </form>
+      </dialog>
     </div>
 
     <!-- Resizable Divider -->
@@ -261,6 +322,7 @@ const needsReset = ref(false);
 const currentTime = ref(0);
 const currentDistance = ref(0);
 const logs = ref<SimulationLog[]>([]);
+const showHelpModal = ref(false);
 
 const params = reactive({
   angle: 30,
