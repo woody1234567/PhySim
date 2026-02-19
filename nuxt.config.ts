@@ -10,11 +10,11 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
   },
 
-  css: ["./app/tailwind.css"],
+  css: ["./app/tailwind.css", "katex/dist/katex.min.css"],
 
   app: {
     head: {
-      title: "PhysSim",
+      title: "PhySim",
       meta: [{ name: "description", content: "A physics simulation website" }],
       link: [
         {

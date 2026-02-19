@@ -46,21 +46,21 @@
                 When an object is on an inclined plane, gravity is decomposed into two components:
               </p>
               <ul class="list-disc ml-6 mt-2 space-y-1">
-                <li><strong>Parallel component ($F_x$):</strong> $m \cdot g \cdot \sin(\theta)$ - drives the motion down the slope.</li>
-                <li><strong>Perpendicular component ($F_y$):</strong> $m \cdot g \cdot \cos(\theta)$ - pushes against the surface.</li>
+                <li><strong>Parallel component (<MathLatex formula="F_x" />):</strong> <MathLatex formula="m \cdot g \cdot \sin(\theta)" :inline="false" /> - drives the motion down the slope.</li>
+                <li><strong>Perpendicular component (<MathLatex formula="F_y" />):</strong> <MathLatex formula="m \cdot g \cdot \cos(\theta)" :inline="false" /> - pushes against the surface.</li>
               </ul>
             </section>
 
             <section>
               <h4 class="font-bold text-lg text-secondary">2. Friction and Acceleration</h4>
               <p>
-                The net acceleration ($a$) is determined by the balance between the parallel gravity component and the kinetic friction force ($f_k = \mu \cdot N = \mu \cdot m \cdot g \cdot \cos(\theta)$):
+                The net acceleration ( a ) is determined by the balance between the parallel gravity component and the kinetic friction force (<MathLatex   formula="f_k = \mu \cdot N = \mu \cdot m \cdot g \cdot \cos(\theta)" inline="false" />):
               </p>
               <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
-                a = g · (sin(θ) - μ · cos(θ))
+                <MathLatex formula="a = g \cdot (\sin(\theta) - \mu \cdot \cos(\theta))" :inline="false" />
               </div>
               <p>
-                If $\tan(\theta) \le \mu$, the static friction will prevent the object from sliding initially.
+                If <MathLatex formula="\tan(\theta) \le \mu" />, the static friction will prevent the object from sliding initially.
               </p>
             </section>
 
@@ -68,7 +68,7 @@
               <h4 class="font-bold text-lg text-secondary">3. Controls Guide</h4>
               <ul class="list-disc ml-6 space-y-2">
                 <li><strong>Incline Angle:</strong> Increases the parallel force, leading to higher acceleration.</li>
-                <li><strong>Friction Coeff (μ):</strong> Higher values resist motion more strongly.</li>
+                <li><strong>Friction Coeff (<MathLatex formula="\mu" />):</strong> Higher values resist motion more strongly.</li>
                 <li><strong>Mass:</strong> In a vacuum (without air resistance), mass cancels out in the acceleration formula, meaning objects of different weights fall at the same rate!</li>
               </ul>
             </section>
