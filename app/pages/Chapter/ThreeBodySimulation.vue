@@ -22,6 +22,73 @@
         <div>Time: {{ simulationTime.toFixed(2) }} s</div>
         <div>Status: {{ isRunning ? "Running" : "Paused" }}</div>
       </div>
+
+      <!-- Help Button (Top Left Overlay) -->
+      <button
+        @click="showHelpModal = true"
+        class="absolute top-20 left-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all pointer-events-auto"
+        title="Physics Explanation"
+      >
+        <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+      </button>
+
+      <!-- Physics Help Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+        <div class="modal-box max-w-2xl bg-base-100 border border-base-300 text-base-content">
+          <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+            Physics Concepts: The Three-Body Problem
+          </h3>
+
+          <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+            <section>
+              <h4 class="font-bold text-lg text-secondary">1. Newton's Law of Universal Gravitation</h4>
+              <p>
+                Each body in the system exerts a gravitational force on every other body. The force magnitude between body <MathLatex formula="i" /> and body <MathLatex formula="j" /> is:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="F_{ij} = G \frac{m_i m_j}{r^2}" :inline="false" />
+              </div>
+              <p>
+                where <MathLatex formula="r" /> is the distance between the centers of mass of the two bodies.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">2. Vector Sum of Forces</h4>
+              <p>
+                For any single body, the total force acting on it is the vector sum of the forces exerted by all other bodies:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="\vec{F}_i = \sum_{j \neq i} \vec{F}_{ij}" :inline="false" />
+              </div>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">3. Chaos and Non-integrability</h4>
+              <p>
+                Unlike the two-body problem, the general three-body problem has no closed-form analytical solution. It is known for its <strong>sensitivity to initial conditions</strong>, leading to chaotic orbital patterns that can only be predicted using numerical integration methods.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">4. Controls Guide</h4>
+              <ul class="list-disc ml-6 space-y-2">
+                <li><strong>Masses:</strong> Increasing a body's mass increases its gravitational pull and its inertia.</li>
+                <li><strong>G Constant:</strong> Scales the overall strength of gravity in the simulation.</li>
+                <li><strong>Trails:</strong> The glowing lines represent the historical trajectory, helping visualize the complex orbital patterns.</li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="modal-action mt-6">
+            <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button @click="showHelpModal = false">close</button>
+        </form>
+      </dialog>
     </div>
 
     <!-- Resizer Handle -->
@@ -40,8 +107,15 @@
       }"
     >
       <!-- Header -->
-      <div class="bg-base-100 p-4 shadow">
+      <div class="bg-base-100 p-4 shadow flex justify-between items-center">
         <h2 class="text-xl font-bold text-primary">Control Center</h2>
+        <UButton
+          icon="i-lucide-book-open"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click.stop="showHelpModal = true"
+        />
       </div>
 
       <!-- Panel 1: Controls -->
@@ -233,6 +307,7 @@ const sidebarWidth = ref(320);
 const masses = reactive([10, 10, 10]); // Red, Green, Blue
 const G_CONSTANT = ref(5);
 const TIME_STEP = 1 / 60;
+const showHelpModal = ref(true); // Auto-show on first load
 
 // Colors for UI and Three.js
 const bodyColors = ["text-red-500", "text-green-500", "text-blue-500"];
@@ -282,10 +357,8 @@ onMounted(() => {
     initOrbitControls();
     initChart();
 
-    // Start render loop
     requestAnimationFrame(animate);
 
-    // Initial resize to fit
     handleResize();
     window.addEventListener("resize", handleResize);
     window.addEventListener("mouseup", stopResize);
@@ -299,7 +372,7 @@ onBeforeUnmount(() => {
     window.removeEventListener("mouseup", stopResize);
     window.removeEventListener("mousemove", resizeSidebar);
     if (chartInstance) chartInstance.destroy();
-    // Cleanup Three.js resources if needed
+    if (renderer) renderer.dispose();
   }
 });
 
@@ -310,14 +383,12 @@ function initThree() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x050510);
 
-  // Lighting
   const ambientLight = new THREE.AmbientLight(0x404040, 2);
   scene.add(ambientLight);
   const pointLight = new THREE.PointLight(0xffffff, 2, 100);
   pointLight.position.set(0, 20, 20);
   scene.add(pointLight);
 
-  // Camera
   camera = new THREE.PerspectiveCamera(
     45,
     window.innerWidth / window.innerHeight,
@@ -327,7 +398,6 @@ function initThree() {
   camera.position.set(0, 30, 50);
   camera.lookAt(0, 0, 0);
 
-  // Renderer
   renderer = new THREE.WebGLRenderer({
     canvas: canvasRef.value,
     antialias: true,
@@ -335,13 +405,13 @@ function initThree() {
   renderer.setSize(window.innerWidth - sidebarWidth.value, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
 
-  // Grid Helper
   const gridHelper = new THREE.GridHelper(100, 50, 0x444444, 0x222222);
   scene.add(gridHelper);
 
-  // Create Bodies Visuals
   const geometry = new THREE.SphereGeometry(1, 32, 32);
 
+  meshes = [];
+  trailLines = [];
   threeColors.forEach((color, i) => {
     const material = new THREE.MeshStandardMaterial({
       color: color,
@@ -354,7 +424,6 @@ function initThree() {
     scene.add(mesh);
     meshes.push(mesh);
 
-    // Trails
     const trailGeo = new THREE.BufferGeometry();
     const trailMat = new THREE.LineBasicMaterial({
       color: color,
@@ -376,18 +445,16 @@ function initOrbitControls() {
 // --- Physics Setup ---
 function initPhysics() {
   world = new CANNON.World();
-  world.gravity.set(0, 0, 0); // No global gravity, only mutual
+  world.gravity.set(0, 0, 0);
   world.broadphase = new CANNON.NaiveBroadphase();
   world.solver.iterations = 10;
 
-  // Initial Positions (Equilateral triangle roughly)
   const initialPositions = [
     new CANNON.Vec3(10, 0, 0),
     new CANNON.Vec3(-5, 0, 8.66),
     new CANNON.Vec3(-5, 0, -8.66),
   ];
 
-  // Initial Velocities (Tangential for orbit-like motion)
   const initialVelocities = [
     new CANNON.Vec3(0, 0, 2),
     new CANNON.Vec3(-1.73, 0, -1),
@@ -396,7 +463,7 @@ function initPhysics() {
 
   bodies = [];
   masses.forEach((mass, i) => {
-    const shape = new CANNON.Sphere(1); // Visual size is 1
+    const shape = new CANNON.Sphere(1);
     const body = new CANNON.Body({
       mass: mass,
       position: initialPositions[i],
@@ -421,18 +488,14 @@ function applyGravity() {
       bj.position.vsub(bi.position, distVec);
 
       const r = distVec.length();
-      if (r < 0.1) continue; // Avoid singularity
+      if (r < 0.1) continue;
 
-      // F = G * m1 * m2 / r^2
       const forceMagnitude = (G_CONSTANT.value * bi.mass * bj.mass) / (r * r);
 
       distVec.normalize();
       const force = distVec.scale(forceMagnitude);
 
-      // Apply force to body i (towards j)
       bi.force.vadd(force, bi.force);
-
-      // Apply opposite force to body j (towards i)
       bj.force.vsub(force, bj.force);
     }
   }
@@ -443,12 +506,10 @@ function stepSimulation() {
   world.step(TIME_STEP);
   simulationTime.value += TIME_STEP;
 
-  // Update Visuals
   bodies.forEach((body, i) => {
     meshes[i].position.copy(body.position as any);
     meshes[i].quaternion.copy(body.quaternion as any);
 
-    // Update Trails
     trailPoints[i].push(
       new THREE.Vector3(body.position.x, body.position.y, body.position.z)
     );
@@ -460,7 +521,6 @@ function stepSimulation() {
 }
 
 function logData() {
-  // Capture current state
   const entry: LogEntry = {
     t: simulationTime.value,
     bodies: bodies.map((b) => ({
@@ -476,14 +536,12 @@ function logData() {
     })),
   };
 
-  // Keep live data updated for UI
   liveData.value = entry.bodies.map((b) => ({
     position: { x: b.x, y: b.y, z: b.z },
     velocity: { x: b.vx, y: b.vy, z: b.vz },
     acceleration: { x: b.ax, y: b.ay, z: b.az },
   }));
 
-  // Throttle logging to array to avoid memory explosion (every 10 frames)
   if (Math.floor(simulationTime.value / TIME_STEP) % 10 === 0) {
     dataLog.value.push(entry);
   }
@@ -491,39 +549,23 @@ function logData() {
 
 function animate() {
   requestAnimationFrame(animate);
-
-  if (isRunning.value) {
-    stepSimulation();
-  }
-
+  if (isRunning.value) stepSimulation();
   controls.update();
   renderer.render(scene, camera);
 }
 
 // --- Controls ---
-function toggleSimulation() {
-  isRunning.value = !isRunning.value;
-}
+function toggleSimulation() { isRunning.value = !isRunning.value; }
 
 function resetSimulation() {
   isRunning.value = false;
   simulationTime.value = 0;
   dataLog.value = [];
-
-  // Reset Physics World
   bodies.forEach((b) => world.removeBody(b));
   initPhysics();
-
-  // Reset Visuals
   trailPoints.forEach((arr) => (arr.length = 0));
   trailLines.forEach((line) => line.geometry.setFromPoints([]));
-
-  // Update mesh positions immediately
-  bodies.forEach((body, i) => {
-    meshes[i].position.copy(body.position as any);
-  });
-
-  // Clear Chart
+  bodies.forEach((body, i) => meshes[i].position.copy(body.position as any));
   if (chartInstance) {
     chartInstance.data.labels = [];
     chartInstance.data.datasets.forEach((ds) => (ds.data = []));
@@ -531,36 +573,17 @@ function resetSimulation() {
   }
 }
 
-// --- Chart.js ---
+// --- Charting ---
 function initChart() {
   if (!chartCanvas.value) return;
-
   chartInstance = new Chart(chartCanvas.value, {
     type: "line",
     data: {
       labels: [],
       datasets: [
-        {
-          label: "R-Vel",
-          data: [],
-          borderColor: "red",
-          borderWidth: 1,
-          pointRadius: 0,
-        },
-        {
-          label: "G-Vel",
-          data: [],
-          borderColor: "green",
-          borderWidth: 1,
-          pointRadius: 0,
-        },
-        {
-          label: "B-Vel",
-          data: [],
-          borderColor: "blue",
-          borderWidth: 1,
-          pointRadius: 0,
-        },
+        { label: "R-Vel", data: [], borderColor: "red", borderWidth: 1, pointRadius: 0, },
+        { label: "G-Vel", data: [], borderColor: "green", borderWidth: 1, pointRadius: 0, },
+        { label: "B-Vel", data: [], borderColor: "blue", borderWidth: 1, pointRadius: 0, },
       ],
     },
     options: {
@@ -578,57 +601,30 @@ function initChart() {
 
 function updateCharts() {
   if (!chartInstance) return;
-
-  // Resample data for chart (max 100 points)
   const step = Math.max(1, Math.floor(dataLog.value.length / 100));
   const sampled = dataLog.value.filter((_, i) => i % step === 0);
-
   chartInstance.data.labels = sampled.map((d) => d.t.toFixed(1));
-
-  // Plot Velocity Magnitude for each body
-  chartInstance.data.datasets[0].data = sampled.map((d) =>
-    Math.sqrt(d.bodies[0].vx ** 2 + d.bodies[0].vy ** 2 + d.bodies[0].vz ** 2)
-  );
-  chartInstance.data.datasets[1].data = sampled.map((d) =>
-    Math.sqrt(d.bodies[1].vx ** 2 + d.bodies[1].vy ** 2 + d.bodies[1].vz ** 2)
-  );
-  chartInstance.data.datasets[2].data = sampled.map((d) =>
-    Math.sqrt(d.bodies[2].vx ** 2 + d.bodies[2].vy ** 2 + d.bodies[2].vz ** 2)
-  );
-
+  chartInstance.data.datasets[0].data = sampled.map((d) => Math.sqrt(d.bodies[0].vx ** 2 + d.bodies[0].vy ** 2 + d.bodies[0].vz ** 2));
+  chartInstance.data.datasets[1].data = sampled.map((d) => Math.sqrt(d.bodies[1].vx ** 2 + d.bodies[1].vy ** 2 + d.bodies[1].vz ** 2));
+  chartInstance.data.datasets[2].data = sampled.map((d) => Math.sqrt(d.bodies[2].vx ** 2 + d.bodies[2].vy ** 2 + d.bodies[2].vz ** 2));
   chartInstance.update();
 }
 
-// --- Export Logic ---
 function exportLogsToCSV() {
   if (dataLog.value.length === 0) return;
-
-  let csv =
-    "t,r_x,r_y,r_z,r_vx,r_vy,r_vz,g_x,g_y,g_z,g_vx,g_vy,g_vz,b_x,b_y,b_z,b_vx,b_vy,b_vz\n";
-
+  let csv = "t,r_x,r_y,r_z,r_vx,r_vy,r_vz,g_x,g_y,g_z,g_vx,g_vy,g_vz,b_x,b_y,b_z,b_vx,b_vy,b_vz\n";
   dataLog.value.forEach((row) => {
-    const r = row.bodies[0];
-    const g = row.bodies[1];
-    const b = row.bodies[2];
-    csv += `${row.t.toFixed(3)},${r.x},${r.y},${r.z},${r.vx},${r.vy},${r.vz},${
-      g.x
-    },${g.y},${g.z},${g.vx},${g.vy},${g.vz},${b.x},${b.y},${b.z},${b.vx},${
-      b.vy
-    },${b.vz}\n`;
+    const r = row.bodies[0], g = row.bodies[1], b = row.bodies[2];
+    csv += `${row.t.toFixed(3)},${r.x},${r.y},${r.z},${r.vx},${r.vy},${r.vz},${g.x},${g.y},${g.z},${g.vx},${g.vy},${g.vz},${b.x},${b.y},${b.z},${b.vx},${b.vy},${b.vz}\n`;
   });
-
   downloadCSV(csv, "simulation_data.csv");
 }
-
-function exportChartData() {
-  // Reuse same logic or specific chart data
-  exportLogsToCSV();
-}
+function exportChartData() { exportLogsToCSV(); }
 
 function downloadCSV(content: string, filename: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
   link.setAttribute("href", url);
   link.setAttribute("download", filename);
   link.style.visibility = "hidden";
@@ -637,77 +633,39 @@ function downloadCSV(content: string, filename: string) {
   document.body.removeChild(link);
 }
 
-// --- Resizing Logic ---
+// --- Resizing ---
 const isResizing = ref(false);
-
-function startResize(e: MouseEvent) {
-  isResizing.value = true;
-  document.body.style.cursor = "col-resize";
-}
-
-function stopResize() {
-  isResizing.value = false;
-  document.body.style.cursor = "";
-}
-
+function startResize() { isResizing.value = true; document.body.style.cursor = "col-resize"; }
+function stopResize() { isResizing.value = false; document.body.style.cursor = ""; }
 function resizeSidebar(e: MouseEvent) {
   if (!isResizing.value) return;
-
   const newWidth = window.innerWidth - e.clientX;
-  const minCanvasWidth = 300;
-  const maxSidebar = window.innerWidth - minCanvasWidth;
-
-  // Clamp width
-  if (newWidth >= 260 && newWidth <= 600 && newWidth <= maxSidebar) {
+  if (newWidth >= 260 && newWidth <= 600 && (window.innerWidth - newWidth >= 300)) {
     sidebarWidth.value = newWidth;
     handleResize();
   }
 }
-
 function handleResize() {
   if (!canvasContainer.value || !renderer || !camera) return;
-
-  const w = window.innerWidth - sidebarWidth.value - 8; // -8 for resizer width approx
+  const w = window.innerWidth - sidebarWidth.value - 8;
   const h = window.innerHeight;
-
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
 }
-
-// Helper
 function formatVec(v: { x: number; y: number; z: number } | undefined) {
   if (!v) return "0.00, 0.00, 0.00";
   return `${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)}`;
 }
-
-// Watch for mass changes to update bodies live if not running (or even if running)
-watch(
-  masses,
-  (newMasses) => {
-    if (!world) return;
-    bodies.forEach((b, i) => {
-      b.mass = newMasses[i];
-      b.updateMassProperties();
-    });
-  },
-  { deep: true }
-);
+watch(masses, (newMasses) => {
+  if (!world) return;
+  bodies.forEach((b, i) => { b.mass = newMasses[i]; b.updateMassProperties(); });
+}, { deep: true });
 </script>
 
 <style scoped>
-/* Custom scrollbar for panels */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #1f2937;
-}
-::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #1f2937; }
+::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #6b7280; }
 </style>
