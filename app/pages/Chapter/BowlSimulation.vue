@@ -16,6 +16,82 @@
         <div>Time: {{ simulationTime.toFixed(2) }} s</div>
         <div>FPS: {{ fps }}</div>
       </div>
+
+      <!-- Help Button (Top Right) -->
+      <button
+        @click="showHelpModal = true"
+        class="absolute top-4 right-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all"
+        title="Physics Explanation"
+      >
+        <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+      </button>
+
+      <!-- Physics Help Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+        <div class="modal-box max-w-2xl bg-base-100 border border-base-300">
+          <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+            Physics Concepts: Bowl Simulation
+          </h3>
+
+          <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+            <section>
+              <h4 class="font-bold text-lg text-secondary">1. Surface Geometry</h4>
+              <p>
+                The simulation features a particle moving on a curved parabolic surface defined by the equation:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="z = a \cdot x^2 + b \cdot y^2" :inline="false" />
+              </div>
+              <p>
+                where <MathLatex formula="a" /> and <MathLatex formula="b" /> determine the curvature along the X and Y axes respectively.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">2. Energy Conservation</h4>
+              <p>
+                In the absence of friction, the total mechanical energy is conserved:
+              </p>
+              <ul class="list-disc ml-6 mt-2 space-y-1">
+                <li><strong>Potential Energy (PE):</strong> <MathLatex formula="U = m \cdot g \cdot z" :inline="false" /></li>
+                <li><strong>Kinetic Energy (KE):</strong> <MathLatex formula="K = \frac{1}{2} m v^2" :inline="false" /></li>
+                <li><strong>Total Energy:</strong> <MathLatex formula="E = K + U" :inline="false" /></li>
+              </ul>
+              <p class="mt-2 text-xs opacity-70 italic">
+                Note: The ball starts from rest at the specified initial height, converting its initial potential energy into kinetic energy as it slides down.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">3. Lagrangian Dynamics</h4>
+              <p>
+                The motion is calculated using Lagrangian mechanics, specifically constrained motion on a manifold. The simulation enforces the constraint that the particle must remain on the surface <MathLatex formula="f(x,y,z) = z - ax^2 - by^2 = 0" />.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">4. Friction & Work</h4>
+              <p>
+                When friction is enabled, the system experiences non-conservative forces. The work done by friction is calculated as:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="W_{fric} = \int \vec{F}_{fric} \cdot d\vec{s}" :inline="false" />
+              </div>
+              <p>
+                This results in a gradual decrease in total mechanical energy over time.
+              </p>
+            </section>
+          </div>
+
+          <div class="modal-action mt-6">
+            <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button @click="showHelpModal = false">close</button>
+        </form>
+      </dialog>
     </div>
 
     <!-- Resizer Handle -->
@@ -32,9 +108,15 @@
       :style="{ width: sidebarWidth + 'px' }"
     >
       <div
-        class="p-4 font-bold text-lg border-b border-base-300 bg-base-100 shadow-sm"
+        class="p-4 font-bold text-lg border-b border-base-300 bg-base-100 shadow-sm flex justify-between items-center"
       >
-        Physics Lab
+        <span>Physics Lab</span>
+        <UButton
+          icon="i-lucide-book-open"
+          color="neutral"
+          variant="ghost"
+          @click="showHelpModal = true"
+        />
       </div>
 
       <div class="overflow-y-auto flex-1 p-2 space-y-2">
@@ -208,6 +290,7 @@ const chartCanvasRef = ref<HTMLCanvasElement | null>(null);
 const isRunning = ref(false);
 const simulationTime = ref(0);
 const fps = ref(0);
+const showHelpModal = ref(true); // Auto-show on first load
 
 // Physics Parameters
 const params = reactive({
@@ -370,15 +453,6 @@ const rebuildSurfaceMesh = () => {
 };
 
 // --- Physics Logic (Lagrangian Dynamics) ---
-// Surface: z = ax^2 + by^2
-// Point P on surface: (x, y, ax^2+by^2)
-// Velocity V: (vx, vy, 2ax*vx + 2by*vy)
-// Speed squared V^2: vx^2 + vy^2 + (2ax*vx + 2by*vy)^2
-// PE = mgz = mg(ax^2+by^2)
-// KE = 0.5 * m * (vx^2 + vy^2 + (2ax*vx + 2by*vy)^2)
-// L = KE - PE
-// Equations of motion are derived from d/dt(dL/dv) - dL/dx = Q (generalized forces)
-
 const getSurfaceZ = (x: number, y: number) => {
   return params.a * x * x + params.b * y * y;
 };
@@ -400,10 +474,6 @@ const resetSimulation = () => {
   dataLog = [];
 
   // Reset State: Place ball at pure energy height on Y-axis
-  // startHeight H.
-  // We want z = H.
-  // z = b*y^2 => y = sqrt(H/b)
-  // v = 0
   const yStart = Math.sqrt(params.startHeight / params.b);
 
   simState = {
@@ -438,27 +508,8 @@ const stepPhysics = () => {
     const { x, y, vx, vy } = simState;
     const m = params.mass;
 
-    // Coefficients for Lagrangian equations
-    // z = ax^2 + by^2
-    // dz/dx = 2ax, dz/dy = 2by
     const zx = 2 * params.a * x;
     const zy = 2 * params.b * y;
-
-    const zxx = 2 * params.a;
-    const zyy = 2 * params.b;
-    const zxy = 0; // independent axes
-
-    // Derived from Euler-Lagrange equations for this surface
-    // M(q) * q_dd + C(q, q_d) + G(q) = Q
-    // This is complex to solve analytically for implicit integration.
-    // We will use a simplified numerical force approach projecting gravity onto tangent space.
-    // Actually, let's use the exact equations of motion for x and y.
-
-    // 1. Calculate Acceleration candidates based on Gravity
-    // F_gravity_z = -mg.
-    // We need to find x_dd and y_dd.
-    // It is easier to use Total Energy gradients or forces.
-    // Let's use the Tangent Space projection method which is robust for constraints.
 
     // Current Position & Velocity in 3D
     const z = getSurfaceZ(x, y);
@@ -473,82 +524,41 @@ const stepPhysics = () => {
 
     // Forces
     const F_g = new THREE.Vector3(0, 0, -m * g);
-
-    // Tangent Gravity Component
-    // F_tangent = F_g - (F_g . N) * N
     const f_dot_n = F_g.dot(N);
     const F_n = N.clone().multiplyScalar(f_dot_n);
-    const F_t = F_g.clone().sub(F_n);
 
-    // Centripetal/Curvature Forces (Velocity dependent)
-    // This is the tricky part with just tangent projection.
-    // A particle moving on a curved surface needs centripetal force to stay on it.
-    // However, simpler is simply to update V += F/m * dt, then Project V back to tangent plane.
-
-    // Explicit Integration with Projection
-    // 1. Apply Gravity
     V.addScaledVector(F_g, h / m);
 
-    // 2. Friction
+    // Friction
     if (params.frictionEnabled) {
       const speed = V.length();
       if (speed > 0.0001) {
-        // Normal Force Magnitude approx mg * cos(theta) + centripetal
-        // For simplicity, let's just use the normal component of gravity we found + approximate centripetal
-        // Actually, simply: F_friction = -mu * |F_normal| * dir(V)
-        // |F_normal| approx |mg cos theta| ?
-        // Better: use the Constraint Force lambda.
-        // Simplest valid approximation for education: F_f = -mu * m * g * v_hat (simplified normal)
-        // or just viscous drag F_f = -k * V for "friction-like" energy loss.
-        // User asked for W = F.S, implies dry friction.
-        // Let's compute Normal force magnitude purely from static component for stability
         const N_mag = Math.abs(F_n.length());
         const F_f_mag = params.mu * N_mag;
 
-        // Apply friction opposite to velocity
         const v_dir = V.clone().normalize();
         const F_f = v_dir.multiplyScalar(-F_f_mag);
 
-        // Work done dW = F_f . V * dt
-        const dW = F_f_mag * speed * h; // Magnitude * distance. Work is energy LOSS.
-        energies.workFriction -= dW; // Accumulate negative work
+        const dW = F_f_mag * speed * h;
+        energies.workFriction -= dW;
 
         V.addScaledVector(F_f, h / m);
       }
     }
 
-    // 3. Update Position
     Pos.addScaledVector(V, h);
 
-    // 4. Constraint Enforcement (Projection)
-    // We have new x, y, z. But z must match surface(x,y).
-    // We simply reset z to surface(x,y) and re-project V to be tangent.
     const newX = Pos.x;
     const newY = Pos.y;
-    const newZ_surf = getSurfaceZ(newX, newY);
-
-    // Update Sim State
     simState.x = newX;
     simState.y = newY;
 
-    // Re-calculate Tangent for velocity projection
-    const zx_new = 2 * params.a * newX;
-    const zy_new = 2 * params.b * newY;
-    // Tangent basis vectors: T1 = (1, 0, zx), T2 = (0, 1, zy)
-    // Actual velocity vector V must be tangent.
-    // V_new = V_old projected onto plane?
-    // Or we just keep vx, vy and derive vz?
-    // If we just keep vx, vy from the 3D update, we might gain/lose energy due to discrete steps.
-    // But 3D projection is usually better.
-
-    // We already updated V in 3D. Let's strictly enforce tangency.
     const n_new = getSurfaceNormal(newX, newY);
     const N_new = new THREE.Vector3(n_new.x, n_new.y, n_new.z);
 
     const v_dot_n = V.dot(N_new);
     V.sub(N_new.multiplyScalar(v_dot_n));
 
-    // Extract vx, vy from this tangent 3D vector
     simState.vx = V.x;
     simState.vy = V.y;
   }
@@ -559,36 +569,25 @@ const stepPhysics = () => {
 };
 
 const updateStateDisplay = () => {
-  // 1. Calculate visual position (Ball Radius Offset)
   const { x, y } = simState;
   const z_surf = getSurfaceZ(x, y);
   const n = getSurfaceNormal(x, y);
 
-  // Ball Center = Surface Point + Radius * Normal
   const bx = x + params.radius * n.x;
   const by = y + params.radius * n.y;
   const bz = z_surf + params.radius * n.z;
 
-  // Visual Update
   ballMesh.position.set(bx, by, bz);
 
-  // Roll simulation (approximate)
-  // Rotate ball based on velocity? For now just position.
-
-  // 2. Physics Data
-  // Recalculate true 3D Velocity for Energy
   const zx = 2 * params.a * x;
   const zy = 2 * params.b * y;
   const vz = zx * simState.vx + zy * simState.vy;
 
   const v_sq = simState.vx ** 2 + simState.vy ** 2 + vz ** 2;
-  const speed = Math.sqrt(v_sq);
 
-  ballState.pos = { x: bx, y: by, z: bz }; // Show Center Pos
+  ballState.pos = { x: bx, y: by, z: bz };
   ballState.vel = { x: simState.vx, y: simState.vy, z: vz };
 
-  // Energy Calculation
-  // PE = m * g * z_center (actually usually defined at CM)
   const g = 9.8;
   energies.pe = params.mass * g * bz;
   energies.ke = 0.5 * params.mass * v_sq;
@@ -603,7 +602,7 @@ const logData = () => {
       ke: energies.ke.toFixed(3),
       work: energies.workFriction.toFixed(3),
       total: energies.total.toFixed(3),
-      mech: (energies.total + energies.workFriction).toFixed(3), // Adjusted Total
+      mech: (energies.total + energies.workFriction).toFixed(3),
     });
   }
 };
@@ -703,13 +702,27 @@ const exportChartCSV = () => {
   document.body.removeChild(link);
 };
 
+// --- Export CSV ---
+const exportCSV = () => {
+  const headers = "t,pe,ke,work,total,mech";
+  const rows = dataLog.map(d => `${d.t},${d.pe},${d.ke},${d.work},${d.total},${d.mech}`);
+  const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "bowl_sim_data.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 // --- Animation Loop ---
 const animate = (time: number) => {
-  requestAnimationFrame(animate);
+  animationFrameId = requestAnimationFrame(animate);
 
   const delta = time - lastTime;
   lastTime = time;
-  fps.value = Math.round(1000 / delta);
+  fps.value = delta > 0 ? Math.round(1000 / delta) : 0;
 
   stepPhysics();
   controls.update();
