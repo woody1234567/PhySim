@@ -19,6 +19,85 @@
         <h2 class="font-bold">Ideal Gas Simulation</h2>
         <p class="text-xs">Particles: {{ particleCount }}</p>
       </div>
+
+      <!-- Help Button (Top Right) -->
+      <button
+        @click="showHelpModal = true"
+        class="absolute top-4 right-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all"
+        title="Physics Explanation"
+      >
+        <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+      </button>
+
+      <!-- Physics Help Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+        <div class="modal-box max-w-2xl bg-base-100 border border-base-300 text-base-content">
+          <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+            Physics Concepts: Ideal Gas Law
+          </h3>
+
+          <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+            <section>
+              <h4 class="font-bold text-lg text-secondary">1. The State Equation</h4>
+              <p>
+                The relationship between pressure, volume, and temperature for an ideal gas is given by:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="P \cdot V = n \cdot R \cdot T" :inline="false" />
+              </div>
+              <p>
+                In this microscopic simulation, we use the equivalent form:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="P \cdot V = N \cdot k \cdot T" :inline="false" />
+              </div>
+              <p>
+                Where <MathLatex formula="N" /> is the number of particles and <MathLatex formula="k" /> is the Boltzmann constant.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">2. Kinetic Theory of Gases</h4>
+              <p>
+                Temperature is a measure of the average kinetic energy of the particles:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="\bar{K} = \frac{3}{2} k T" :inline="false" />
+              </div>
+              <p>
+                The Root-Mean-Square (RMS) velocity of a particle is:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="v_{rms} = \sqrt{\frac{3 k T}{m}}" :inline="false" />
+              </div>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">3. Pressure Origins</h4>
+              <p>
+                Pressure results from the continuous collisions of particles with the container walls. Each collision transfers momentum (<MathLatex formula="\Delta p" />), exerting a force on the area.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">4. Controls & Observations</h4>
+              <ul class="list-disc ml-6 space-y-2">
+                <li><strong>Temperature (T):</strong> Increases particle speed and collision frequency/force.</li>
+                <li><strong>Volume (V):</strong> Controlled by Container Size (L). Decreasing volume increases collision frequency.</li>
+                <li><strong>Particle Count (N):</strong> More particles lead to higher pressure due to more frequent wall impacts.</li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="modal-action mt-6">
+            <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button @click="showHelpModal = false">close</button>
+        </form>
+      </dialog>
     </div>
 
     <!-- Resizer Handle -->
@@ -41,7 +120,16 @@
         class="collapse collapse-arrow border-b border-base-300 bg-base-100 rounded-none"
       >
         <input type="checkbox" checked />
-        <div class="collapse-title text-lg font-medium">Control Panel</div>
+        <div class="collapse-title text-lg font-medium flex justify-between items-center pr-12">
+          <span>Control Panel</span>
+          <UButton
+            icon="i-lucide-book-open"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click.stop="showHelpModal = true"
+          />
+        </div>
         <div class="collapse-content space-y-4">
           <!-- Simulation Control -->
           <div class="flex gap-2">
@@ -232,7 +320,6 @@ import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 // --- Types & Constants ---
 
 // Physics Constants
-const BOLTZMANN_K = 1.380649e-23; // Real physics constant, but scaled for simulation visual
 // To make numbers readable, we'll use a "Simulation Boltzmann" constant
 const SIM_K = 1.0;
 const PARTICLE_MASS = 1.0;
@@ -266,6 +353,7 @@ const boxSize = ref(10); // Length of side of cube
 const particleCount = ref(100);
 
 const isPaused = ref(false);
+const showHelpModal = ref(true); // Auto-show on first load
 
 // --- Simulation Metrics ---
 const currentPressure = ref(0);
@@ -273,11 +361,6 @@ const currentTemperature = ref(0);
 const totalKineticEnergy = ref(0);
 
 const pv_nrt = computed(() => {
-  // PV = nRT check
-  // P = currentPressure
-  // V = boxSize^3
-  // n = particleCount
-  // R*T = (N * k * T)
   const V = Math.pow(boxSize.value, 3);
   const nkT =
     particleCount.value * SIM_K * Math.max(currentTemperature.value, 1);
@@ -346,7 +429,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
-  renderer.dispose();
+  if (renderer) renderer.dispose();
+  if (chartInstance) chartInstance.destroy();
 });
 
 const initThree = () => {
@@ -411,38 +495,28 @@ const initOrbitControls = () => {
   controls.dampingFactor = 0.05;
 };
 
-const createParticles = () => {
-  // Remove functionality handled in resetSimulation
-};
-
 const updateWallPositions = () => {
   const halfSize = boxSize.value / 2;
 
   // Visual Mesh
   wallMesh.scale.set(boxSize.value, boxSize.value, boxSize.value);
 
-  // Cannon Planes (Normals pointing inwards)
-  // +X wall (Normal -1, 0, 0) Pos (halfSize, 0, 0)
+  // Cannon Planes
   wallBodies[0].position.set(halfSize, 0, 0);
   wallBodies[0].quaternion.setFromEuler(0, -Math.PI / 2, 0);
 
-  // -X wall (Normal 1, 0, 0) Pos (-halfSize, 0, 0)
   wallBodies[1].position.set(-halfSize, 0, 0);
   wallBodies[1].quaternion.setFromEuler(0, Math.PI / 2, 0);
 
-  // +Y wall (Normal 0, -1, 0) Pos (0, halfSize, 0)
   wallBodies[2].position.set(0, halfSize, 0);
   wallBodies[2].quaternion.setFromEuler(Math.PI / 2, 0, 0);
 
-  // -Y wall (Normal 0, 1, 0) Pos (0, -halfSize, 0)
   wallBodies[3].position.set(0, -halfSize, 0);
   wallBodies[3].quaternion.setFromEuler(-Math.PI / 2, 0, 0);
 
-  // +Z wall (Normal 0, 0, -1) Pos (0, 0, halfSize)
   wallBodies[4].position.set(0, 0, halfSize);
-  wallBodies[4].quaternion.setFromEuler(0, Math.PI, 0); // Rotate 180 Y to face -Z
+  wallBodies[4].quaternion.setFromEuler(0, Math.PI, 0);
 
-  // -Z wall (Normal 0, 0, 1) Pos (0, 0, -halfSize)
   wallBodies[5].position.set(0, 0, -halfSize);
   wallBodies[5].quaternion.setFromEuler(0, 0, 0);
 };
@@ -464,9 +538,7 @@ const resetSimulation = () => {
   scene.add(particleMesh);
 
   // Init velocities based on Temperature
-  // v_rms = sqrt(3kT/m)
   const v_rms = Math.sqrt((3 * SIM_K * temperature.value) / PARTICLE_MASS);
-
   const halfL = boxSize.value / 2 - PARTICLE_RADIUS;
 
   for (let i = 0; i < particleCount.value; i++) {
@@ -475,17 +547,15 @@ const resetSimulation = () => {
       shape: new CANNON.Sphere(PARTICLE_RADIUS),
       material: particleMaterial,
       linearDamping: 0,
-      angularDamping: 0, // No rotation loss
+      angularDamping: 0,
     });
 
-    // Random Position
     body.position.set(
       (Math.random() - 0.5) * 2 * halfL,
       (Math.random() - 0.5) * 2 * halfL,
       (Math.random() - 0.5) * 2 * halfL,
     );
 
-    // Random Velocity Direction
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
     const vx = v_rms * Math.sin(phi) * Math.cos(theta);
@@ -499,14 +569,10 @@ const resetSimulation = () => {
   }
 
   updateWallPositions();
-  updateMeasuredStats(); // Initial stats
+  updateMeasuredStats();
 };
 
 const thermalize = (targetT: number) => {
-  // Rescale velocities to match target Temperature
-  // Current Average KE = 1/2 m v^2_avg.
-  // T = (2/3k) * KE_avg
-
   let totalKE = 0;
   particles.forEach((p) => {
     totalKE += 0.5 * p.mass * p.velocity.lengthSquared();
@@ -514,10 +580,9 @@ const thermalize = (targetT: number) => {
   const avgKE = totalKE / particles.length;
   const currentT = (2 * avgKE) / (3 * SIM_K);
 
-  if (currentT <= 0.001) return; // Avoid div by zero
+  if (currentT <= 0.001) return;
 
   const scale = Math.sqrt(targetT / currentT);
-
   particles.forEach((p) => {
     p.velocity.scale(scale, p.velocity);
   });
@@ -526,73 +591,43 @@ const thermalize = (targetT: number) => {
 const constrainParticles = () => {
   const halfL = boxSize.value / 2 - PARTICLE_RADIUS;
   particles.forEach((p) => {
-    // X
-    if (p.position.x > halfL) {
-      p.position.x = halfL;
-      p.velocity.x = -Math.abs(p.velocity.x);
-    } else if (p.position.x < -halfL) {
-      p.position.x = -halfL;
-      p.velocity.x = Math.abs(p.velocity.x);
-    }
-    // Y
-    if (p.position.y > halfL) {
-      p.position.y = halfL;
-      p.velocity.y = -Math.abs(p.velocity.y);
-    } else if (p.position.y < -halfL) {
-      p.position.y = -halfL;
-      p.velocity.y = Math.abs(p.velocity.y);
-    }
-    // Z
-    if (p.position.z > halfL) {
-      p.position.z = halfL;
-      p.velocity.z = -Math.abs(p.velocity.z);
-    } else if (p.position.z < -halfL) {
-      p.position.z = -halfL;
-      p.velocity.z = Math.abs(p.velocity.z);
-    }
+    if (p.position.x > halfL) { p.position.x = halfL; p.velocity.x = -Math.abs(p.velocity.x); }
+    else if (p.position.x < -halfL) { p.position.x = -halfL; p.velocity.x = Math.abs(p.velocity.x); }
+    if (p.position.y > halfL) { p.position.y = halfL; p.velocity.y = -Math.abs(p.velocity.y); }
+    else if (p.position.y < -halfL) { p.position.y = -halfL; p.velocity.y = Math.abs(p.velocity.y); }
+    if (p.position.z > halfL) { p.position.z = halfL; p.velocity.z = -Math.abs(p.velocity.z); }
+    else if (p.position.z < -halfL) { p.position.z = -halfL; p.velocity.z = Math.abs(p.velocity.z); }
   });
 };
 
 const stepSimulation = () => {
   if (isPaused.value) return;
 
-  // --- Mode Specific Logic ---
-  // Thermalize to maintain T (simple thermostat)
   thermalize(temperature.value);
 
-  // physics sub-steps
   for (let i = 0; i < SUBSTEPS; i++) {
     world.step(TIME_STEP);
     constrainParticles();
   }
 
   simTime += TIME_STEP * SUBSTEPS;
-
   updateMeasuredStats();
 
-  // Log Data every 10 frames (~6 times per sec)
   if (Math.floor(simTime / (TIME_STEP * SUBSTEPS)) % 10 === 0) {
     logData();
   }
 };
 
 const updateMeasuredStats = () => {
-  // 1. Calculate Kinetic Energy & Temperature
   let ke = 0;
   particles.forEach((p) => {
     ke += 0.5 * p.mass * p.velocity.lengthSquared();
   });
   totalKineticEnergy.value = ke;
 
-  // T = (2/3k) * (KE_avg)
-  // KE_avg = ke / N
   const N = Math.max(1, particles.length);
   currentTemperature.value = (2 * (ke / N)) / (3 * SIM_K);
 
-  // 2. Calculate Pressure
-  // P = (2/3) * (E_k / V)
-  // E_k = totalKineticEnergy
-  // V = boxSize^3
   const V = Math.pow(boxSize.value, 3);
   if (V > 0) {
     currentPressure.value = (2 * totalKineticEnergy.value) / (3 * V);
@@ -611,7 +646,6 @@ const logData = () => {
     kineticEnergy: Number(totalKineticEnergy.value.toFixed(2)),
   });
 
-  // Limit log size
   if (logs.value.length > 2000) logs.value.shift();
 };
 
@@ -619,8 +653,6 @@ const animate = () => {
   requestAnimationFrame(animate);
   stepSimulation();
 
-  // Sync Visuals
-  const dummy = new THREE.Object3D();
   for (let i = 0; i < particles.length; i++) {
     dummy.position.copy(particles[i].position as any);
     dummy.updateMatrix();
@@ -638,13 +670,8 @@ const togglePause = () => {
   isPaused.value = !isPaused.value;
 };
 
-const onTemperatureChange = () => {
-  // Logic handled in stepSimulation via thermalize
-};
-
-const onVolumeChange = () => {
-  updateWallPositions();
-};
+const onTemperatureChange = () => {};
+const onVolumeChange = () => { updateWallPositions(); };
 
 const handleResize = () => {
   if (!canvasContainer.value || !renderer || !camera) return;
@@ -664,9 +691,7 @@ const initChart = () => {
     data: { datasets: [] },
     options: {
       responsive: true,
-      plugins: {
-        legend: { display: false },
-      },
+      plugins: { legend: { display: false } },
       scales: {
         x: { title: { display: true, text: "X Axis" } },
         y: { title: { display: true, text: "Y Axis" } },
@@ -678,77 +703,38 @@ const initChart = () => {
 const plotChart = () => {
   if (!chartInstance) return;
 
-  // Sample logs
-  // Type PT: P vs T
-  // Type PV: P vs V
-  // Type VT: V vs T
-
   const data = logs.value.map((l) => {
-    let x = 0;
-    let y = 0;
-    if (selectedChartType.value === "PT") {
-      x = l.temperature;
-      y = l.pressure;
-    } else if (selectedChartType.value === "PV") {
-      x = l.volume;
-      y = l.pressure;
-    } else if (selectedChartType.value === "VT") {
-      x = l.temperature;
-      y = l.volume;
-    }
+    let x = 0, y = 0;
+    if (selectedChartType.value === "PT") { x = l.temperature; y = l.pressure; }
+    else if (selectedChartType.value === "PV") { x = l.volume; y = l.pressure; }
+    else if (selectedChartType.value === "VT") { x = l.temperature; y = l.volume; }
     return { x, y };
   });
 
-  let xLabel = "";
-  let yLabel = "";
-  if (selectedChartType.value === "PT") {
-    xLabel = "Temperature (K)";
-    yLabel = "Pressure (Pa)";
-  } else if (selectedChartType.value === "PV") {
-    xLabel = "Volume (m³)";
-    yLabel = "Pressure (Pa)";
-  } else if (selectedChartType.value === "VT") {
-    xLabel = "Temperature (K)";
-    yLabel = "Volume (m³)";
-  }
+  let xLabel = "", yLabel = "";
+  if (selectedChartType.value === "PT") { xLabel = "Temperature (K)"; yLabel = "Pressure (Pa)"; }
+  else if (selectedChartType.value === "PV") { xLabel = "Volume (m³)"; yLabel = "Pressure (Pa)"; }
+  else if (selectedChartType.value === "VT") { xLabel = "Temperature (K)"; yLabel = "Volume (m³)"; }
 
   chartInstance.data = {
-    datasets: [
-      {
-        label: selectedChartType.value,
-        data: data,
-        backgroundColor: "rgba(75, 192, 192, 1)",
-      },
-    ],
+    datasets: [{
+      label: selectedChartType.value,
+      data: data,
+      backgroundColor: "rgba(75, 192, 192, 1)",
+    }],
   };
 
-  if (chartInstance.options.scales?.x?.title)
-    chartInstance.options.scales.x.title.text = xLabel;
-  if (chartInstance.options.scales?.y?.title)
-    chartInstance.options.scales.y.title.text = yLabel;
+  if (chartInstance.options.scales?.x?.title) chartInstance.options.scales.x.title.text = xLabel;
+  if (chartInstance.options.scales?.y?.title) chartInstance.options.scales.y.title.text = yLabel;
 
   chartInstance.update();
 };
 
 // --- Export ---
 const exportLogsToCSV = () => {
-  const headers = [
-    "Time",
-    "Pressure",
-    "Temperature",
-    "Volume",
-    "ParticleCount",
-    "KineticEnergy",
-  ];
+  const headers = ["Time", "Pressure", "Temperature", "Volume", "ParticleCount", "KineticEnergy"];
   const rows = logs.value.map((l) =>
-    [
-      l.time,
-      l.pressure,
-      l.temperature,
-      l.volume,
-      l.particleCount,
-      l.kineticEnergy,
-    ].join(","),
+    [l.time, l.pressure, l.temperature, l.volume, l.particleCount, l.kineticEnergy].join(",")
   );
   downloadCSV("simulation_data.csv", [headers.join(","), ...rows].join("\n"));
 };
@@ -765,10 +751,7 @@ const exportChartData = () => {
   if (selectedChartType.value === "VT") headers = ["Temperature", "Volume"];
 
   const rows = data.map((pt) => `${pt.x},${pt.y}`);
-  downloadCSV(
-    `chart_data_${selectedChartType.value}.csv`,
-    [headers.join(","), ...rows].join("\n"),
-  );
+  downloadCSV(`chart_data_${selectedChartType.value}.csv`, [headers.join(","), ...rows].join("\n"));
 };
 
 const downloadCSV = (filename: string, content: string) => {
@@ -787,19 +770,8 @@ const downloadCSV = (filename: string, content: string) => {
 </script>
 
 <style scoped>
-/* Scrollbar personalization for the sidebar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
 </style>
