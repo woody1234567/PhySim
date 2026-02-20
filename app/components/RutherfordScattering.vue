@@ -19,6 +19,76 @@
         <p>Right Click: Pan</p>
         <p>Scroll: Zoom</p>
       </div>
+
+      <!-- Help Button (Top Left Overlay) -->
+      <button
+        @click="showHelpModal = true"
+        class="absolute top-24 left-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all pointer-events-auto shadow-md"
+        title="Physics Explanation"
+      >
+        <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+      </button>
+
+      <!-- Physics Help Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+        <div class="modal-box max-w-2xl bg-base-100 border border-base-300 text-base-content">
+          <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+            Physics Concepts: Rutherford Scattering
+          </h3>
+
+          <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+            <section>
+              <h4 class="font-bold text-lg text-secondary">1. Coulomb Repulsion</h4>
+              <p>
+                Rutherford scattering is the scattering of charged particles by the Coulomb interaction. In this simulation, an alpha particle (positively charged) is repelled by a fixed heavy nucleus (also positively charged):
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="F = k \frac{Q q}{r^2}" :inline="false" />
+              </div>
+              <p>
+                where <MathLatex formula="kQq" /> is the combined Coulomb constant and <MathLatex formula="r" /> is the distance between them.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">2. Impact Parameter (b)</h4>
+              <p>
+                The impact parameter <MathLatex formula="b" /> is the perpendicular distance between the path of a projectile and the center of a potential field. It determines how close the particle gets to the nucleus and thus the magnitude of the deflection.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">3. Scattering Angle (θ)</h4>
+              <p>
+                The relationship between the impact parameter and the scattering angle is given by the Rutherford formula:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="\theta = 2 \cdot \cot^{-1} \left( \frac{2b \cdot K}{kQq} \right)" :inline="false" />
+              </div>
+              <p>
+                where <MathLatex formula="K" /> is the initial kinetic energy. Small <MathLatex formula="b" /> leads to large deflection angles.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">4. Controls Guide</h4>
+              <ul class="list-disc ml-6 space-y-2">
+                <li><strong>Initial Velocity:</strong> Affects the kinetic energy. Faster particles deflect less for the same <MathLatex formula="b" />.</li>
+                <li><strong>Impact Parameter (b):</strong> Adjust the vertical offset of the incoming alpha particle.</li>
+                <li><strong>Coulomb Constant:</strong> Simulates the charge strength of the nucleus (e.g., Gold vs. Lead).</li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="modal-action mt-6">
+            <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button @click="showHelpModal = false">close</button>
+        </form>
+      </dialog>
     </div>
 
     <!-- Resizer Handle -->
@@ -35,10 +105,17 @@
       :style="{ width: sidebarWidth + 'px', minWidth: '260px' }"
     >
       <!-- Header -->
-      <div class="p-4 border-b border-base-300 bg-base-100">
+      <div class="p-4 border-b border-base-300 bg-base-100 flex justify-between items-center">
         <h2 class="text-xl font-bold flex items-center gap-2">
-          <span class="text-primary">⚛️</span> Controls
+          <span class="text-primary">⚛️</span> <span>Controls</span>
         </h2>
+        <UButton
+          icon="i-lucide-book-open"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click.stop="showHelpModal = true"
+        />
       </div>
 
       <!-- Scrollable Content -->
@@ -253,11 +330,12 @@ const simulationTime = ref(0);
 const currentDistance = ref(0);
 const currentSpeed = ref(0);
 const scatteringAngle = ref<number | null>(null);
+const showHelpModal = ref(true); // Auto-show on first load
 
 // Parameters
 const alphaVelocity = ref(10);
 const impactParameter = ref(2);
-const coulombConstant = ref(1000); // kQq
+const coulombConstant = ref(1000); 
 const particleMass = 1;
 
 // Refs
@@ -290,15 +368,9 @@ const chartDataPoints = ref<{ x: number; y: number }[]>([]);
 // --- Lifecycle ---
 onMounted(() => {
   if (import.meta.client) {
-    initThree();
-    initPhysics();
-    initOrbitControls();
-    initChart();
-
+    initThree(); initPhysics(); initOrbitControls(); initChart();
     window.addEventListener("resize", handleResize);
-    handleResize(); // Initial sizing
-
-    // Start loop
+    handleResize();
     animate();
   }
 });
@@ -315,89 +387,48 @@ onUnmounted(() => {
 // --- Initialization ---
 function initThree() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a1a); // Dark background for contrast
+  scene.background = new THREE.Color(0x1a1a1a);
   scene.fog = new THREE.FogExp2(0x1a1a1a, 0.005);
-
-  // Camera
-  camera = new THREE.PerspectiveCamera(
-    45,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000,
-  );
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000,);
   camera.position.set(0, 40, 40);
   camera.lookAt(0, 0, 0);
-
-  // Renderer
-  renderer = new THREE.WebGLRenderer({
-    canvas: canvasRef.value!,
-    antialias: true,
-    alpha: true,
-  });
+  renderer = new THREE.WebGLRenderer({ canvas: canvasRef.value!, antialias: true, alpha: true, });
   renderer.shadowMap.enabled = true;
-
-  // Lights
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambientLight);
-
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
   dirLight.position.set(10, 20, 10);
   dirLight.castShadow = true;
   scene.add(dirLight);
-
-  // Grid
   const gridHelper = new THREE.GridHelper(100, 20, 0x444444, 0x222222);
   scene.add(gridHelper);
-
-  // Nucleus (Gold?) - Fixed at origin
   const nucleusGeo = new THREE.SphereGeometry(1.5, 32, 32);
-  const nucleusMat = new THREE.MeshStandardMaterial({
-    color: 0xffd700,
-    emissive: 0xaa6600,
-    emissiveIntensity: 0.2,
-    roughness: 0.2,
-    metalness: 0.8,
-  });
+  const nucleusMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xaa6600, emissiveIntensity: 0.2, roughness: 0.2, metalness: 0.8, });
   nucleusMesh = new THREE.Mesh(nucleusGeo, nucleusMat);
   nucleusMesh.position.set(0, 0, 0);
   nucleusMesh.castShadow = true;
   scene.add(nucleusMesh);
-
-  // Nucleus Label or Glow could be added, but keep simple
-
-  // Alpha Particle
   const alphaGeo = new THREE.SphereGeometry(0.5, 16, 16);
-  const alphaMat = new THREE.MeshStandardMaterial({
-    color: 0xff3333,
-    emissive: 0xff0000,
-    emissiveIntensity: 0.5,
-  });
+  const alphaMat = new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0xff0000, emissiveIntensity: 0.5, });
   alphaMesh = new THREE.Mesh(alphaGeo, alphaMat);
   alphaMesh.castShadow = true;
   scene.add(alphaMesh);
-
-  // Trail
   const trailGeo = new THREE.BufferGeometry().setFromPoints(trailPoints);
   const trailMat = new THREE.LineBasicMaterial({ color: 0xffaaaa });
   trailLine = new THREE.Line(trailGeo, trailMat);
   scene.add(trailLine);
-
   updateAlphaVisualsFromParams();
 }
 
 function initPhysics() {
   world = new CANNON.World();
-  world.gravity.set(0, 0, 0); // No gravity, only electrostatic force
+  world.gravity.set(0, 0, 0);
   world.broadphase = new CANNON.NaiveBroadphase();
-
-  // Alpha Body
   const shape = new CANNON.Sphere(0.5);
   alphaBody = new CANNON.Body({ mass: particleMass });
   alphaBody.addShape(shape);
-  alphaBody.linearDamping = 0; // No air resistance in space
+  alphaBody.linearDamping = 0;
   world.addBody(alphaBody);
-
-  // Init position off-screen or based on params
   resetSimulationState();
 }
 
@@ -411,338 +442,123 @@ function initOrbitControls() {
 
 function initChart() {
   if (!chartCanvas.value) return;
-
   chartInstance = new Chart(chartCanvas.value, {
     type: "scatter",
-    data: {
-      datasets: [
-        {
-          label: "Experimental Data",
-          data: [],
-          backgroundColor: "rgb(255, 99, 132)",
-        },
-      ],
-    },
+    data: { datasets: [{ label: "Experimental Data", data: [], backgroundColor: "rgb(255, 99, 132)", },], },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       scales: {
-        x: {
-          title: { display: true, text: "Impact Parameter (b)" },
-          type: "linear",
-          min: 0,
-        },
-        y: {
-          title: { display: true, text: "Scattering Angle (deg)" },
-          min: 0,
-          max: 180,
-        },
+        x: { title: { display: true, text: "Impact Parameter (b)" }, type: "linear", min: 0, },
+        y: { title: { display: true, text: "Scattering Angle (deg)" }, min: 0, max: 180, },
       },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: (context) => {
-              const x = context.parsed.x as number;
-              const y = context.parsed.y as number;
-              return `b: ${x.toFixed(2)}, θ: ${y.toFixed(1)}°`;
-            },
-          },
-        },
-      },
+      plugins: { tooltip: { callbacks: { label: (context) => { const x = context.parsed.x as number; const y = context.parsed.y as number; return `b: ${x.toFixed(2)}, θ: ${y.toFixed(1)}°`; }, }, }, },
     },
   });
 }
 
-// --- Simulation Logic ---
-
 function updateAlphaVisualsFromParams() {
-  // Start position: far left (-x), offset by b (y or z - let's use z for impact parameter to look nice from side?)
-  // Actually, standard 2D view is usually X-Y plane. Let's start at x = -50, y = b, z = 0.
-  // Wait, if nucleus is at origin, and we want to see it deflect.
-  // Start: x = -50, y = impactParameter. Velocity: +x.
-
-  if (!isSimulating.value) {
-    alphaMesh.position.set(-50, impactParameter.value, 0);
-    // Clear trail
-    trailPoints = [];
-    if (trailLine) trailLine.geometry.setFromPoints(trailPoints);
-  }
+  if (!isSimulating.value) { alphaMesh.position.set(-50, impactParameter.value, 0); trailPoints = []; if (trailLine) trailLine.geometry.setFromPoints(trailPoints); }
 }
 
-// Watch params to update preview when not simulating
-watch([impactParameter, alphaVelocity], () => {
-  if (!isSimulating.value) {
-    updateAlphaVisualsFromParams();
-  }
-});
+watch([impactParameter, alphaVelocity], () => { if (!isSimulating.value) updateAlphaVisualsFromParams(); });
 
 function resetSimulationState() {
-  // Reset physics body
-  alphaBody.velocity.set(0, 0, 0);
+  alphaBody.velocity.set(alphaVelocity.value, 0, 0);
   alphaBody.angularVelocity.set(0, 0, 0);
   alphaBody.position.set(-50, impactParameter.value, 0);
-
-  // Set initial velocity
-  alphaBody.velocity.set(alphaVelocity.value, 0, 0);
-
-  // Reset visuals
   alphaMesh.position.copy(alphaBody.position as any);
-
-  // Clear trace
   trailPoints = [new THREE.Vector3().copy(alphaMesh.position)];
   if (trailLine) trailLine.geometry.setFromPoints(trailPoints);
-
-  simulationTime.value = 0;
-  currentDistance.value = alphaMesh.position.length();
-  scatteringAngle.value = null;
-  dataLog.value = [];
+  simulationTime.value = 0; currentDistance.value = alphaMesh.position.length(); scatteringAngle.value = null; dataLog.value = [];
 }
 
-function startSimulation() {
-  if (isSimulating.value) return;
-  resetSimulationState();
-  isSimulating.value = true;
-  isPaused.value = false;
-}
-
-function resetSimulation() {
-  isSimulating.value = false;
-  isPaused.value = false;
-  resetSimulationState();
-}
-
-function togglePause() {
-  isPaused.value = !isPaused.value;
-}
+function startSimulation() { if (isSimulating.value) return; resetSimulationState(); isSimulating.value = true; isPaused.value = false; }
+function resetSimulation() { isSimulating.value = false; isPaused.value = false; resetSimulationState(); }
+function togglePause() { isPaused.value = !isPaused.value; }
 
 function stepSimulation() {
   if (!isSimulating.value || isPaused.value) return;
-
-  // 1. Calculate Electrostatic Force (Coulomb Law)
-  // F = kQq / r^2 * (direction vector)
-  // direction = pos / r
-  // Vector F = kQq * pos / r^3
-
   const pos = alphaBody.position;
   const rSq = pos.lengthSquared();
   const r = Math.sqrt(rSq);
-
-  // Avoid singularity
-  if (r > 0.1) {
-    const forceMag = coulombConstant.value / rSq; // F = C / r^2
-    // F_vec = F_mag * (pos / r)
-    // F_vec = C/r^2 * pos/r = C * pos / r^3
-
-    // We can also just use scalar magnitude and normalize pos
-    const forceVec = pos.clone().scale(forceMag / r); // Repulsive force (away from origin)
-
-    // Apply force
-    alphaBody.force.copy(forceVec);
-  }
-
-  // 2. Step Physics
-  // Using fixed time step for consistency, but accumulated time for rendering could be better.
-  // For this simple simulation, stepping once per frame is usually fine if fps is stable.
+  if (r > 0.1) { const forceMag = coulombConstant.value / rSq; const forceVec = pos.clone().scale(forceMag / r); alphaBody.force.copy(forceVec); }
   world.step(timeStep);
-
-  // 3. Update State
-  simulationTime.value += timeStep;
-  currentDistance.value = r;
-  currentSpeed.value = alphaBody.velocity.length();
-
-  // 4. Update Visuals
+  simulationTime.value += timeStep; currentDistance.value = r; currentSpeed.value = alphaBody.velocity.length();
   alphaMesh.position.copy(alphaBody.position as any);
-
-  // Trail
-  if (simulationTime.value % 0.05 < 0.01) {
-    // Optimize trail points
-    trailPoints.push(new THREE.Vector3().copy(alphaMesh.position));
-    if (trailLine) trailLine.geometry.setFromPoints(trailPoints);
-  }
-
-  // 5. Log Data
+  if (simulationTime.value % 0.05 < 0.01) { trailPoints.push(new THREE.Vector3().copy(alphaMesh.position)); if (trailLine) trailLine.geometry.setFromPoints(trailPoints); }
   logFrame();
-
-  // 6. Check Completion
-  // Stop if particle is far away AND moving away
-  if (r > 60 && pos.x > 0) {
-    // Passed the nucleus and far enough
-    calculateResults();
-  }
+  if (r > 60 && pos.x > 0) calculateResults();
 }
 
 function calculateResults() {
-  isSimulating.value = false; // Stop sim
-
-  // Calculate final angle
-  // Initial velocity vector: (v0, 0, 0)
-  // Final velocity vector: alphaBody.velocity
-  // cos(theta) = (v_in . v_out) / (|v_in| |v_out|)
-  const vFinal = alphaBody.velocity;
-  const vInitial = new CANNON.Vec3(alphaVelocity.value, 0, 0);
-
-  // Dot product
-  const dot = vInitial.dot(vFinal);
-  const magIn = vInitial.length();
-  const magOut = vFinal.length(); // Should be same as magIn by conservation of energy (if integration is accurate)
-
-  // Safety
-  let cosTheta = dot / (magIn * magOut);
-  cosTheta = Math.min(1, Math.max(-1, cosTheta));
-
-  const angleRad = Math.acos(cosTheta);
-  const angleDeg = angleRad * (180 / Math.PI);
-
+  isSimulating.value = false;
+  const vFinal = alphaBody.velocity; const vInitial = new CANNON.Vec3(alphaVelocity.value, 0, 0);
+  const dot = vInitial.dot(vFinal); const magIn = vInitial.length(); const magOut = vFinal.length();
+  let cosTheta = dot / (magIn * magOut); cosTheta = Math.min(1, Math.max(-1, cosTheta));
+  const angleRad = Math.acos(cosTheta); const angleDeg = angleRad * (180 / Math.PI);
   scatteringAngle.value = angleDeg;
-
-  // Add to chart
   addToChart(impactParameter.value, angleDeg);
 }
 
-// --- Charting ---
 function addToChart(b: number, theta: number) {
-  // Check if point exists strictly? No, let user add multiples.
-  // Sort logic maybe?
   chartDataPoints.value.push({ x: b, y: theta });
-
-  // Sort for nicer Line connection? Scatter doesn't need sort, but if we want to see a trend...
-  // Let's keep it unsorted or sort by X
   chartDataPoints.value.sort((a, b) => a.x - b.x);
-
   updateChart();
 }
 
-function updateChart() {
-  if (!chartInstance) return;
-  chartInstance.data.datasets[0].data = chartDataPoints.value;
-  chartInstance.update();
-}
+function updateChart() { if (!chartInstance) return; chartInstance.data.datasets[0].data = chartDataPoints.value; chartInstance.update(); }
+function clearChart() { chartDataPoints.value = []; scatteringAngle.value = null; updateChart(); }
 
-function clearChart() {
-  chartDataPoints.value = [];
-  scatteringAngle.value = null;
-  updateChart();
-}
-
-// --- Logging ---
 function logFrame() {
   dataLog.value.push({
     time: simulationTime.value.toFixed(3),
-    x: alphaBody.position.x.toFixed(3),
-    y: alphaBody.position.y.toFixed(3),
-    z: alphaBody.position.z.toFixed(3),
-    distance: currentDistance.value.toFixed(3),
-    speed: currentSpeed.value.toFixed(3),
-    kineticEnergy: (
-      0.5 *
-      particleMass *
-      Math.pow(currentSpeed.value, 2)
-    ).toFixed(3),
+    x: alphaBody.position.x.toFixed(3), y: alphaBody.position.y.toFixed(3), z: alphaBody.position.z.toFixed(3),
+    distance: currentDistance.value.toFixed(3), speed: currentSpeed.value.toFixed(3),
+    kineticEnergy: (0.5 * particleMass * Math.pow(currentSpeed.value, 2)).toFixed(3),
     potentialEnergy: (coulombConstant.value / currentDistance.value).toFixed(3),
   });
 }
 
 function exportLogsToCSV() {
   if (dataLog.value.length === 0) return;
-
   const headers = Object.keys(dataLog.value[0]).join(",");
   const rows = dataLog.value.map((row) => Object.values(row).join(","));
-  const csvContent =
-    "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
-
+  const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
   const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "rutherford_simulation_data.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "rutherford_simulation_data.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
 function exportChartCSV() {
   if (chartDataPoints.value.length === 0) return;
-  const csvContent =
-    "data:text/csv;charset=utf-8," +
-    "Impact Parameter (b),Scattering Angle (deg)\n" +
-    chartDataPoints.value.map((p) => `${p.x},${p.y}`).join("\n");
-
+  const csvContent = "data:text/csv;charset=utf-8," + "Impact Parameter (b),Scattering Angle (deg)\n" + chartDataPoints.value.map((p) => `${p.x},${p.y}`).join("\n");
   const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "scattering_results.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "scattering_results.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
-// --- Loop ---
-function animate() {
-  animationId = requestAnimationFrame(animate);
+function animate() { animationId = requestAnimationFrame(animate); stepSimulation(); controls.update(); renderer.render(scene, camera); }
 
-  stepSimulation();
-  controls.update(); // Required for damping
-  renderer.render(scene, camera);
-}
-
-// --- Layout / Resize ---
 let isResizing = false;
-function startResize(e: MouseEvent) {
-  isResizing = true;
-  document.addEventListener("mousemove", handleMouseMove);
-  document.addEventListener("mouseup", stopResize);
-  document.body.style.cursor = "col-resize";
-}
-
+function startResize(e: MouseEvent) { isResizing = true; document.addEventListener("mousemove", handleMouseMove); document.addEventListener("mouseup", stopResize); document.body.style.cursor = "col-resize"; }
 function handleMouseMove(e: MouseEvent) {
   if (!isResizing) return;
   const containerRect = mainContainer.value!.getBoundingClientRect();
   const rawNewWidth = containerRect.right - e.clientX;
-
-  // Constraints
-  const minCanvasWidth = 300;
-  const maxSidebar = containerRect.width - minCanvasWidth;
-
-  sidebarWidth.value = Math.max(260, Math.min(rawNewWidth, maxSidebar, 600));
-  handleResize(); // Force camera update
+  sidebarWidth.value = Math.max(260, Math.min(rawNewWidth, containerRect.width - 300, 600));
+  handleResize();
 }
-
-function stopResize() {
-  isResizing = false;
-  document.removeEventListener("mousemove", handleMouseMove);
-  document.removeEventListener("mouseup", stopResize);
-  document.body.style.cursor = "";
-}
+function stopResize() { isResizing = false; document.removeEventListener("mousemove", handleMouseMove); document.removeEventListener("mouseup", stopResize); document.body.style.cursor = ""; }
 
 function handleResize() {
   if (!canvasContainer.value || !renderer || !camera) return;
-
-  const width = canvasContainer.value.clientWidth;
-  const height = canvasContainer.value.clientHeight;
-
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-  renderer.setSize(width, height);
+  const width = canvasContainer.value.clientWidth; const height = canvasContainer.value.clientHeight;
+  camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height);
 }
 </script>
 
 <style scoped>
-/* Scrollbar Styling for Webkit */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-.range-xs {
-  height: 1.25rem;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.range-xs { height: 1.25rem; }
 </style>
