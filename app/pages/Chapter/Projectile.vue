@@ -26,6 +26,72 @@
           <span class="w-3 h-3 rounded-full bg-red-500"></span> Acceleration
         </div>
       </div>
+
+      <!-- Help Button (Top Left Overlay) -->
+      <button
+        @click="showHelpModal = true"
+        class="absolute top-4 left-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all pointer-events-auto"
+        title="Physics Explanation"
+      >
+        <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+      </button>
+
+      <!-- Physics Help Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+        <div class="modal-box max-w-2xl bg-base-100 border border-base-300 text-base-content">
+          <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+            Physics Concepts: Projectile Motion
+          </h3>
+
+          <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+            <section>
+              <h4 class="font-bold text-lg text-secondary">1. Independence of Motion</h4>
+              <p>
+                Projectile motion is a form of motion experienced by an object that is projected near the Earth's surface and moves along a curved path under the action of gravity only. The horizontal and vertical motions are independent:
+              </p>
+              <ul class="list-disc ml-6 mt-2 space-y-1">
+                <li><strong>Horizontal:</strong> Uniform motion (constant velocity) since there is no horizontal acceleration (ignoring air resistance).</li>
+                <li><strong>Vertical:</strong> Uniformly accelerated motion due to constant gravity (<MathLatex formula="g" />).</li>
+              </ul>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">2. Mathematical Equations</h4>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="x = v_0 \cos(\theta) \cdot t" :inline="false" />
+                <MathLatex formula="y = v_0 \sin(\theta) \cdot t - \frac{1}{2} g t^2" :inline="false" />
+              </div>
+              <p>
+                The resulting path is a <strong>parabola</strong>. The time of flight and maximum height depend solely on the vertical component of the initial velocity.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">3. Velocity Vector</h4>
+              <p>
+                The instantaneous velocity (<MathLatex formula="\vec{v}" />) is always tangential to the trajectory. Its magnitude (speed) changes as the vertical component is affected by gravity, while the horizontal component remains constant.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">4. Controls Guide</h4>
+              <ul class="list-disc ml-6 space-y-2">
+                <li><strong>Initial Speed:</strong> Determines the magnitude of the launch velocity.</li>
+                <li><strong>Launch Angle:</strong> Controls the ratio between horizontal and vertical velocity. 45° maximizes range on level ground.</li>
+                <li><strong>Gravity:</strong> Adjust the local gravitational pull. Negative values pull the object downward.</li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="modal-action mt-6">
+            <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button @click="showHelpModal = false">close</button>
+        </form>
+      </dialog>
     </div>
     <!-- RESIZER BAR -->
     <div
@@ -41,10 +107,17 @@
       :style="{ width: sidebarWidth + 'px', minWidth: '260px' }"
     >
       <!-- Header -->
-      <div class="p-4 bg-primary text-primary-content shadow-md z-10">
+      <div class="p-4 bg-primary text-primary-content shadow-md z-10 flex justify-between items-center">
         <h1 class="text-lg font-bold flex items-center gap-2">
           <span>🚀</span> Projectile Sim
         </h1>
+        <UButton
+          icon="i-lucide-book-open"
+          color="white"
+          variant="ghost"
+          size="xs"
+          @click.stop="showHelpModal = true"
+        />
       </div>
 
       <div class="flex-grow p-2 space-y-2">
@@ -239,6 +312,7 @@ const minCanvasWidth = 300;
 const isSimulating = ref(false);
 const isPaused = ref(false);
 const isFinished = ref(false);
+const showHelpModal = ref(true); // Auto-show on first load
 let animationFrameId: number;
 
 // Physics Parameters
@@ -311,14 +385,7 @@ const startResize = () => {
 const onResize = (e: MouseEvent) => {
   const maxWidth = window.innerWidth - minCanvasWidth;
   const newWidth = window.innerWidth - e.clientX;
-
-  if (newWidth >= 260 && newWidth <= maxWidth) {
-    sidebarWidth.value = newWidth;
-  } else if (newWidth > maxWidth) {
-    sidebarWidth.value = maxWidth;
-  }
-
-  // Trigger canvas resize update
+  if (newWidth >= 260 && newWidth <= maxWidth) { sidebarWidth.value = newWidth; } else if (newWidth > maxWidth) { sidebarWidth.value = maxWidth; }
   handleWindowResize();
 };
 
@@ -333,139 +400,67 @@ const stopResize = () => {
 
 const initThree = () => {
   if (!canvasContainer.value) return;
-
-  // Scene
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x111111);
   scene.fog = new THREE.Fog(0x111111, 20, 100);
-
-  // Camera
-  const aspect =
-    canvasContainer.value.clientWidth / canvasContainer.value.clientHeight;
+  const aspect = canvasContainer.value.clientWidth / canvasContainer.value.clientHeight;
   camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
   camera.position.set(10, 10, 20);
-
-  // Renderer
   renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(
-    canvasContainer.value.clientWidth,
-    canvasContainer.value.clientHeight
-  );
+  renderer.setSize(canvasContainer.value.clientWidth, canvasContainer.value.clientHeight);
   renderer.shadowMap.enabled = true;
   canvasContainer.value.appendChild(renderer.domElement);
-
-  // Controls
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-
-  // Lights
   const ambientLight = new THREE.AmbientLight(0x404040);
   scene.add(ambientLight);
-
   const dirLight = new THREE.DirectionalLight(0xffffff, 1);
   dirLight.position.set(10, 20, 10);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
   scene.add(dirLight);
-
-  // Grid & Axes
   const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
   scene.add(gridHelper);
   const axesHelper = new THREE.AxesHelper(2);
   scene.add(axesHelper);
-
-  // Objects
-  // 1. Ground
   const groundGeo = new THREE.PlaneGeometry(200, 200);
-  const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x333333,
-    roughness: 0.8,
-    metalness: 0.2,
-  });
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8, metalness: 0.2, });
   groundMesh = new THREE.Mesh(groundGeo, groundMat);
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
-
-  // 2. Ball
   const ballGeo = new THREE.SphereGeometry(params.radius, 32, 32);
-  const ballMat = new THREE.MeshStandardMaterial({
-    color: 0xff0055,
-    roughness: 0.4,
-  });
+  const ballMat = new THREE.MeshStandardMaterial({ color: 0xff0055, roughness: 0.4, });
   ballMesh = new THREE.Mesh(ballGeo, ballMat);
   ballMesh.castShadow = true;
   scene.add(ballMesh);
-
-  // 3. Trajectory Line
   const lineMat = new THREE.LineBasicMaterial({ color: 0xffff00 });
   const lineGeo = new THREE.BufferGeometry();
   trajectoryLine = new THREE.Line(lineGeo, lineMat);
   scene.add(trajectoryLine);
-
-  // 4. Vectors
-  velocityArrow = new THREE.ArrowHelper(
-    new THREE.Vector3(1, 0, 0),
-    new THREE.Vector3(0, 0, 0),
-    1,
-    0x22c55e // Green
-  );
+  velocityArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1, 0x22c55e);
   scene.add(velocityArrow);
-
-  accelArrow = new THREE.ArrowHelper(
-    new THREE.Vector3(1, 0, 0),
-    new THREE.Vector3(0, 0, 0),
-    1,
-    0xef4444 // Red
-  );
+  accelArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1, 0xef4444);
   scene.add(accelArrow);
-
-  // Initial render
   renderer.render(scene, camera);
 };
-
-// ==========================================
-// 🧱 PHYSICS SETUP (CANNON-ES)
-// ==========================================
 
 const initPhysics = () => {
   world = new CANNON.World();
   world.gravity.set(0, params.gravity, 0);
-
-  // Physics Materials
   const concreteMaterial = new CANNON.Material("concrete");
   const plasticMaterial = new CANNON.Material("plastic");
-
-  const contactMaterial = new CANNON.ContactMaterial(
-    concreteMaterial,
-    plasticMaterial,
-    {
-      friction: 0.1,
-      restitution: 0.6, // Bounciness
-    }
-  );
+  const contactMaterial = new CANNON.ContactMaterial(concreteMaterial, plasticMaterial, { friction: 0.1, restitution: 0.6, });
   world.addContactMaterial(contactMaterial);
-
-  // Ground Body
   const groundShape = new CANNON.Plane();
   groundBody = new CANNON.Body({ mass: 0, material: concreteMaterial });
   groundBody.addShape(groundShape);
   groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(groundBody);
-
-  // Ball Body
   const ballShape = new CANNON.Sphere(params.radius);
-  ballBody = new CANNON.Body({
-    mass: params.mass,
-    material: plasticMaterial,
-    linearDamping: 0.01,
-    angularDamping: 0.01,
-  });
+  ballBody = new CANNON.Body({ mass: params.mass, material: plasticMaterial, linearDamping: 0.01, angularDamping: 0.01, });
   ballBody.addShape(ballShape);
   world.addBody(ballBody);
-
-  // Sync initial position
   resetBallPosition();
 };
 
@@ -477,274 +472,107 @@ const resetBallPosition = () => {
   ballMesh.quaternion.copy(ballBody.quaternion as any);
 };
 
-// ==========================================
-// ⚙️ SIMULATION LOGIC
-// ==========================================
-
 const startRestartSimulation = () => {
-  // Reset Physics World
   world.gravity.set(0, params.gravity, 0);
   resetBallPosition();
-
-  // Calculate Launch Velocity (Shoot along X-axis for simplicity)
   const rad = params.angle * (Math.PI / 180);
   const vx = params.speed * Math.cos(rad);
   const vy = params.speed * Math.sin(rad);
-
   ballBody.velocity.set(vx, vy, 0);
-
-  // Reset State
-  dataLogs = [];
-  isFinished.value = false;
-  isPaused.value = false;
-  isSimulating.value = true;
-
-  // Clear Trajectory
+  dataLogs = []; isFinished.value = false; isPaused.value = false; isSimulating.value = true;
   trajectoryLine.geometry.setFromPoints([]);
-
-  // Clear Chart
-  if (chartInstance) {
-    chartInstance.destroy();
-    chartInstance = null;
-  }
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
 };
 
-const togglePause = () => {
-  isPaused.value = !isPaused.value;
-};
+const togglePause = () => { isPaused.value = !isPaused.value; };
 
 const stepSimulation = () => {
   if (isPaused.value || isFinished.value) return;
-
-  // Step physics
-  // Step physics
   const timeStep = 1 / 60;
-  const vPrev = ballBody.velocity.clone(); // Capture previous velocity
+  const vPrev = ballBody.velocity.clone();
   world.step(timeStep);
   const vCurr = ballBody.velocity;
-
-  // Calculate Acceleration (a = dv/dt)
   const accel = vCurr.vsub(vPrev).scale(1 / timeStep);
-
-  // Sync Mesh
   ballMesh.position.copy(ballBody.position as any);
   ballMesh.quaternion.copy(ballBody.quaternion as any);
-
-  // Data Logging
   const t = dataLogs.length * timeStep;
   const pos = ballBody.position;
   const vel = ballBody.velocity;
-
-  const frameData = {
-    t: parseFloat(t.toFixed(3)),
-    x: parseFloat(pos.x.toFixed(3)),
-    y: parseFloat(pos.y.toFixed(3)),
-    z: parseFloat(pos.z.toFixed(3)),
-    vx: parseFloat(vel.x.toFixed(3)),
-    vy: parseFloat(vel.y.toFixed(3)),
-    vz: parseFloat(vel.z.toFixed(3)),
-    ax: parseFloat(accel.x.toFixed(3)),
-    ay: parseFloat(accel.y.toFixed(3)),
-    az: parseFloat(accel.z.toFixed(3)),
-  };
-
+  const frameData = { t: parseFloat(t.toFixed(3)), x: parseFloat(pos.x.toFixed(3)), y: parseFloat(pos.y.toFixed(3)), z: parseFloat(pos.z.toFixed(3)), vx: parseFloat(vel.x.toFixed(3)), vy: parseFloat(vel.y.toFixed(3)), vz: parseFloat(vel.z.toFixed(3)), ax: parseFloat(accel.x.toFixed(3)), ay: parseFloat(accel.y.toFixed(3)), az: parseFloat(accel.z.toFixed(3)), };
   dataLogs.push(frameData);
   updateLiveData(frameData);
   updateTrajectory();
   updateVectors(vel, accel);
-
-  // Stop Condition: Touching ground
-  // Use a small threshold epsilon
-  if (pos.y <= params.radius + 0.01 && vel.y <= 0) {
-    isFinished.value = true;
-    isSimulating.value = false;
-    // Snap to floor
-    ballBody.position.y = params.radius;
-    ballBody.velocity.set(0, 0, 0);
-    ballMesh.position.y = params.radius;
-  }
+  if (pos.y <= params.radius + 0.01 && vel.y <= 0) { isFinished.value = true; isSimulating.value = false; ballBody.position.y = params.radius; ballBody.velocity.set(0, 0, 0); ballMesh.position.y = params.radius; }
 };
 
 const updateLiveData = (d: DataPoint) => {
-  liveData.t = d.t.toFixed(2);
-  liveData.x = d.x.toFixed(2);
-  liveData.y = d.y.toFixed(2);
-  liveData.z = d.z.toFixed(2);
-  liveData.vx = d.vx.toFixed(2);
-  liveData.vy = d.vy.toFixed(2);
-  liveData.vz = d.vz.toFixed(2);
-  liveData.ax = d.ax.toFixed(2);
-  liveData.ay = d.ay.toFixed(2);
-  liveData.az = d.az.toFixed(2);
-  liveData.speed = Math.sqrt(d.vx ** 2 + d.vy ** 2 + d.vz ** 2).toFixed(2);
+  liveData.t = d.t.toFixed(2); liveData.x = d.x.toFixed(2); liveData.y = d.y.toFixed(2); liveData.z = d.z.toFixed(2); liveData.vx = d.vx.toFixed(2); liveData.vy = d.vy.toFixed(2); liveData.vz = d.vz.toFixed(2); liveData.ax = d.ax.toFixed(2); liveData.ay = d.ay.toFixed(2); liveData.az = d.az.toFixed(2); liveData.speed = Math.sqrt(d.vx ** 2 + d.vy ** 2 + d.vz ** 2).toFixed(2);
 };
 
 const updateVectors = (vel: CANNON.Vec3, accel: CANNON.Vec3) => {
-  // Velocity Vector (Green)
   const vLen = vel.length();
-  if (vLen > 0.01) {
-    velocityArrow.visible = true;
-    velocityArrow.setDirection(
-      new THREE.Vector3(vel.x, vel.y, vel.z).normalize()
-    );
-    velocityArrow.setLength(vLen * 0.2); // Scale down for visualization
-    velocityArrow.position.copy(ballMesh.position);
-  } else {
-    velocityArrow.visible = false;
-  }
-
-  // Acceleration Vector (Red)
+  if (vLen > 0.01) { velocityArrow.visible = true; velocityArrow.setDirection(new THREE.Vector3(vel.x, vel.y, vel.z).normalize()); velocityArrow.setLength(vLen * 0.2); velocityArrow.position.copy(ballMesh.position); } else { velocityArrow.visible = false; }
   const aLen = accel.length();
-  if (aLen > 0.01) {
-    accelArrow.visible = true;
-    accelArrow.setDirection(
-      new THREE.Vector3(accel.x, accel.y, accel.z).normalize()
-    );
-    accelArrow.setLength(aLen * 0.2); // Scale down for visualization
-    accelArrow.position.copy(ballMesh.position);
-  } else {
-    accelArrow.visible = false;
-  }
+  if (aLen > 0.01) { accelArrow.visible = true; accelArrow.setDirection(new THREE.Vector3(accel.x, accel.y, accel.z).normalize()); accelArrow.setLength(aLen * 0.2); accelArrow.position.copy(ballMesh.position); } else { accelArrow.visible = false; }
 };
 
 const updateTrajectory = () => {
-  if (dataLogs.length % 5 !== 0) return; // Optimization: update line every 5 frames
+  if (dataLogs.length % 5 !== 0) return;
   const points = dataLogs.map((d) => new THREE.Vector3(d.x, d.y, d.z));
   trajectoryLine.geometry.setFromPoints(points);
 };
 
 const renderLoop = () => {
-  if (isSimulating.value) {
-    stepSimulation();
-  }
-
+  if (isSimulating.value) stepSimulation();
   controls.update();
   renderer.render(scene, camera);
   animationFrameId = requestAnimationFrame(renderLoop);
 };
 
-// ==========================================
-// 📈 CHART.JS LOGIC
-// ==========================================
-
 const plotChart = () => {
   if (!chartCanvas.value || dataLogs.length === 0) return;
-
   if (chartInstance) chartInstance.destroy();
-
   const ctx = chartCanvas.value.getContext("2d");
   if (!ctx) return;
-
-  chartInstance = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: dataLogs.map((d) => d.t),
-      datasets: [
-        {
-          label: "Height (Y)",
-          data: dataLogs.map((d) => d.y),
-          borderColor: "rgb(255, 99, 132)",
-          tension: 0.1,
-          pointRadius: 0,
-        },
-        {
-          label: "Velocity Y",
-          data: dataLogs.map((d) => d.vy),
-          borderColor: "rgb(54, 162, 235)",
-          tension: 0.1,
-          pointRadius: 0,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      interaction: {
-        mode: "index",
-        intersect: false,
-      },
-    },
-  });
+  chartInstance = new Chart(ctx, { type: "line", data: { labels: dataLogs.map((d) => d.t), datasets: [{ label: "Height (Y)", data: dataLogs.map((d) => d.y), borderColor: "rgb(255, 99, 132)", tension: 0.1, pointRadius: 0, }, { label: "Velocity Y", data: dataLogs.map((d) => d.vy), borderColor: "rgb(54, 162, 235)", tension: 0.1, pointRadius: 0, },], }, options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: "index", intersect: false, }, }, });
 };
 
-const exportChartCSV = () => {
-  if (!chartInstance) return;
-  exportLogsToCSV(); // Re-using the main export logic as it contains the same source data
-};
-
-// ==========================================
-// 💾 DATA EXPORT
-// ==========================================
+const exportChartCSV = () => { if (!chartInstance) return; exportLogsToCSV(); };
 
 const exportLogsToCSV = () => {
   if (dataLogs.length === 0) return;
-
   const headers = ["time", "x", "y", "z", "vx", "vy", "vz", "ax", "ay", "az"];
-  const rows = dataLogs.map(
-    (d) =>
-      `${d.t},${d.x},${d.y},${d.z},${d.vx},${d.vy},${d.vz},${d.ax},${d.ay},${d.az}`
-  );
-
+  const rows = dataLogs.map((d) => `${d.t},${d.x},${d.y},${d.z},${d.vx},${d.vy},${d.vz},${d.ax},${d.ay},${d.az}`);
   const csvContent = [headers.join(","), ...rows].join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute(
-    "download",
-    `simulation_data_${new Date().toISOString()}.csv`
-  );
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", `simulation_data_${new Date().toISOString()}.csv`); link.style.visibility = "hidden"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
 };
-
-// ==========================================
-// 🔌 LIFECYCLE
-// ==========================================
 
 const handleWindowResize = () => {
   if (!canvasContainer.value || !renderer || !camera) return;
-
-  const w = canvasContainer.value.clientWidth;
-  const h = canvasContainer.value.clientHeight;
-
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h);
+  const w = canvasContainer.value.clientWidth; const h = canvasContainer.value.clientHeight;
+  camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
 };
 
 onMounted(() => {
   isClient.value = true;
-
-  initThree();
-  initPhysics();
-
+  initThree(); initPhysics();
   window.addEventListener("resize", handleWindowResize);
-
-  // ResizeObserver to handle flex-grow changes on the container specifically
   const resizeObserver = new ResizeObserver(() => handleWindowResize());
   if (canvasContainer.value) resizeObserver.observe(canvasContainer.value);
-
   renderLoop();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("resize", handleWindowResize);
   cancelAnimationFrame(animationFrameId);
-
   if (chartInstance) chartInstance.destroy();
   if (renderer) renderer.dispose();
 });
 </script>
 
 <style scoped>
-/* DaisyUI handles most styles, but we ensure chart container fit */
-canvas {
-  width: 100% !important;
-  height: 100% !important;
-}
+canvas { width: 100% !important; height: 100% !important; }
 </style>

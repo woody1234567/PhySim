@@ -4,7 +4,7 @@
   >
     <!-- DAISYUI DRAWER: LAYOUT -->
     <div
-      class="drawer drawer-end h-[800px] w-full rounded-xl shadow-2xl overflow-hidden"
+      class="drawer drawer-end h-screen w-full shadow-2xl overflow-hidden"
     >
       <input
         id="sim-drawer"
@@ -56,6 +56,76 @@
             </svg>
           </label>
 
+          <!-- Help Button (Top Left Overlay) -->
+          <button
+            @click="showHelpModal = true"
+            class="absolute top-20 left-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all"
+            title="Physics Explanation"
+          >
+            <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+          </button>
+
+          <!-- Physics Help Modal -->
+          <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+            <div class="modal-box max-w-2xl bg-base-100 border border-base-300 text-base-content">
+              <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+                <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+                Physics Concepts: Kinetics & Trajectory
+              </h3>
+
+              <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+                <section>
+                  <h4 class="font-bold text-lg text-secondary">1. Projectile Motion</h4>
+                  <p>
+                    The trajectory of the ball is determined by decomposing its initial velocity (<MathLatex formula="v_0" />) into horizontal and vertical components:
+                  </p>
+                  <ul class="list-disc ml-6 mt-2 space-y-1">
+                    <li><strong>Horizontal (<MathLatex formula="v_x" />):</strong> <MathLatex formula="v_0 \cdot \cos(\theta)" /> - Constant (ignoring air resistance).</li>
+                    <li><strong>Vertical (<MathLatex formula="v_y" />):</strong> <MathLatex formula="v_0 \cdot \sin(\theta) - g \cdot t" /> - Subject to gravitational acceleration.</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h4 class="font-bold text-lg text-secondary">2. Position Equations</h4>
+                  <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                    <MathLatex formula="x(t) = v_{0x} \cdot t" :inline="false" />
+                    <MathLatex formula="y(t) = h_0 + v_{0y} \cdot t - \frac{1}{2} g t^2" :inline="false" />
+                  </div>
+                  <p>
+                    where <MathLatex formula="h_0" /> is the initial height and <MathLatex formula="g" /> is the gravitational acceleration.
+                  </p>
+                </section>
+
+                <section>
+                  <h4 class="font-bold text-lg text-secondary">3. Slope Interaction</h4>
+                  <p>
+                    The ground can be tilted by an angle (<MathLatex formula="\alpha" />). This changes the normal vector of the impact surface, affecting how the ball bounces and rolls:
+                  </p>
+                  <ul class="list-disc ml-6 space-y-1">
+                    <li><strong>Friction:</strong> Calculated based on the normal force component and the friction coefficient (<MathLatex formula="\mu" />).</li>
+                    <li><strong>Impact:</strong> The collision handling is performed by the Cannon-es physics engine, simulating elastic restitution.</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h4 class="font-bold text-lg text-secondary">4. Parameters Guide</h4>
+                  <ul class="list-disc ml-6 space-y-2">
+                    <li><strong>Launch Angle:</strong> Controls the direction of initial velocity. 45° typically yields maximum range on flat ground.</li>
+                    <li><strong>Initial Height:</strong> Increases the time of flight and potential energy.</li>
+                    <li><strong>Slope Angle:</strong> Simulates "uphill" (positive) or "downhill" (negative) conditions.</li>
+                  </ul>
+                </section>
+              </div>
+
+              <div class="modal-action mt-6">
+                <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+              </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+              <button @click="showHelpModal = false">close</button>
+            </form>
+          </dialog>
+
           <!-- Canvas Target -->
           <canvas
             ref="canvasRef"
@@ -70,9 +140,18 @@
         <div
           class="menu p-4 w-96 min-h-full bg-base-100 text-base-content flex flex-col gap-4 shadow-xl overflow-y-auto"
         >
-          <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
-            <span>⚙️ Configuration</span>
-          </h2>
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <span>⚙️ Configuration</span>
+            </h2>
+            <UButton
+              icon="i-lucide-book-open"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click.stop="showHelpModal = true"
+            />
+          </div>
 
           <!-- PANEL 1: CONTROLS -->
           <div
@@ -312,6 +391,7 @@ const isRunning = ref(false);
 const isFinished = ref(false);
 const autoPlot = ref(true);
 const currentTime = ref(0);
+const showHelpModal = ref(true); // Auto-show on first load
 
 // Physics Parameters
 const params = reactive({
@@ -518,18 +598,14 @@ function initPhysics() {
   world.addContactMaterial(physicsContactMaterial);
 
   // Ground Body (Infinite Plane)
-  // Note: Cannon planes are infinite and face +Z by default. We must rotate.
   const groundShape = new CANNON.Plane();
   groundBody = new CANNON.Body({ mass: 0, material: physicsMaterial }); // Static
   groundBody.addShape(groundShape);
-
-  // Initial rotation to make it flat (facing up Y)
   groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-
   world.addBody(groundBody);
 
   // Ball Body
-  const sphereShape = new CANNON.Sphere(0.5); // Radius matches visual
+  const sphereShape = new CANNON.Sphere(0.5);
   ballBody = new CANNON.Body({
     mass: params.mass,
     material: physicsMaterial,
@@ -537,10 +613,9 @@ function initPhysics() {
     linearDamping: 0.01,
     angularDamping: 0.01,
   });
-
   world.addBody(ballBody);
 
-  resetSimulation(); // Set initial positions
+  resetSimulation();
 }
 
 // --- 6. SIMULATION CONTROL ---
@@ -555,49 +630,27 @@ function resetSimulation() {
   world.gravity.set(0, -params.gravity, 0);
   physicsContactMaterial.friction = params.friction;
 
-  // 2. Configure Slope (Rotate Ground Body)
-  // Slope Angle alpha. Rotation around Z axis or X axis?
-  // Let's rotate around X axis to tip it towards/away, or Z to tip left/right.
-  // Let's rotate around Z so it looks like a ramp from side view.
-  // Actually, user expects to shoot "forward". A slope usually means "uphill" or "downhill".
-  // Let's rotate around X axis. Positive angle = Uphill.
+  // 2. Configure Slope
   const radSlope = THREE.MathUtils.degToRad(params.slopeAngle);
-
-  // Reset Ground Quaternion to flat first (-90 deg around X) then add slope
   const groundQuat = new CANNON.Quaternion();
   groundQuat.setFromEuler(-Math.PI / 2 + radSlope, 0, 0);
   groundBody.quaternion.copy(groundQuat);
-
-  // Update Visual Slope Container
   slopeContainer.rotation.x = radSlope;
 
   // 3. Configure Ball Initial State
-  // Position: Local to world, but often relative to slope surface in problems.
-  // We will set Position (0, h, 0) in World Space.
-  // If slope is active, we might want to spawn it *on* the slope or above 0.
-  // Let's keep it simple: Spawn at x=0, z=0, y=initialHeight
   ballBody.position.set(0, params.initialHeight, 0);
   ballBody.velocity.set(0, 0, 0);
   ballBody.angularVelocity.set(0, 0, 0);
 
   // 4. Calculate Launch Velocity Vector
-  // Speed v0, Angle theta.
-  // Usually assume launching in +Z direction or +X direction? Let's use +X as "Forward".
   const radLaunch = THREE.MathUtils.degToRad(params.launchAngle);
-
-  // vx = v * cos(theta)
-  // vy = v * sin(theta)
-  // vz = 0
   const vx = params.initialSpeed * Math.cos(radLaunch);
   const vy = params.initialSpeed * Math.sin(radLaunch);
-
   ballBody.velocity.set(vx, vy, 0);
 
-  // Sync visuals immediately
   updateVisuals();
   updateLiveData();
 
-  // Clear chart
   if (chartInstance) {
     chartInstance.data.labels = [];
     chartInstance.data.datasets[0].data = [];
@@ -629,10 +682,7 @@ function animate() {
   const dt = (now - lastCallTime) / 1000;
   lastCallTime = now;
 
-  // Physics Step (Fixed time step for stability)
-  // We use a fixed step for consistency, but call it based on frame time
   world.step(params.timeStep, dt, 3);
-
   currentTime.value += params.timeStep;
 
   updateVisuals();
@@ -647,11 +697,9 @@ function animate() {
 // --- 7. LOGIC & UTILS ---
 
 function updateVisuals() {
-  // Sync Ball
   ballMesh.position.copy(ballBody.position as any);
   ballMesh.quaternion.copy(ballBody.quaternion as any);
 
-  // Sync Arrow Helper (Velocity)
   const vel = ballBody.velocity;
   const speed = vel.length();
   if (speed > 0.1) {
@@ -659,7 +707,7 @@ function updateVisuals() {
     arrowHelper.setDirection(
       new THREE.Vector3(vel.x, vel.y, vel.z).normalize()
     );
-    arrowHelper.setLength(Math.min(speed * 0.5, 5)); // Scale arrow
+    arrowHelper.setLength(Math.min(speed * 0.5, 5));
     arrowHelper.visible = true;
   } else {
     arrowHelper.visible = false;
@@ -674,13 +722,8 @@ function updateLiveData() {
 
   const v = ballBody.velocity.length();
   liveData.v = v.toFixed(2);
-
-  // Approximate acceleration (Force / Mass)
-  // Cannon applies forces then updates velocity.
-  // A simple way: gravity is constant, but contact forces vary.
-  // We'll show the net force magnitude / mass
   const f = ballBody.force.length();
-  liveData.a = (f / params.mass).toFixed(2); // Usually just gravity unless hitting something
+  liveData.a = (f / params.mass).toFixed(2);
 }
 
 function logData() {
@@ -699,27 +742,10 @@ function logData() {
 }
 
 function checkCollisions() {
-  // Determine ground height at current X/Z based on slope
-  // Or simpler: If y < radius (on flat slope) or collision event.
-  // Cannon handles physical collision. We just want to stop logging/simulating if user wants.
-  // Let's define "Finished" if it hits the ground and stays there (speed ~ 0)
-  // OR just if y < -50 (fell off world)
-
   if (ballBody.position.y < -20) {
     pauseSimulation();
     isFinished.value = true;
     if (autoPlot.value) updateChart();
-  }
-
-  // Stop if rolling very slowly on ground
-  if (
-    currentTime.value > 1.0 &&
-    ballBody.velocity.length() < 0.05 &&
-    ballBody.position.y < 2
-  ) {
-    // Check if contact with ground
-    // Simple heuristic: y is close to ground plane height at this x
-    // For this demo, we just let it run until manually stopped or falls off
   }
 }
 
@@ -754,10 +780,7 @@ function initChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: {
-        mode: "index",
-        intersect: false,
-      },
+      interaction: { mode: "index", intersect: false },
       scales: {
         x: { title: { display: true, text: "Time (s)" } },
         y: {
@@ -780,20 +803,16 @@ function initChart() {
 
 function updateChart() {
   if (!chartInstance) return;
-
-  // Downsample data for chart performance (every 5th frame)
   const step = 5;
   const labels = [];
   const dataY = [];
   const dataV = [];
-
   for (let i = 0; i < dataLog.length; i += step) {
     const p = dataLog[i];
     labels.push(p.t.toFixed(2));
     dataY.push(p.y);
     dataV.push(Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz));
   }
-
   chartInstance.data.labels = labels;
   chartInstance.data.datasets[0].data = dataY;
   chartInstance.data.datasets[1].data = dataV;
@@ -804,17 +823,12 @@ function updateChart() {
 
 function downloadCSV() {
   if (dataLog.length === 0) return;
-
   let csv = "Time,PosX,PosY,PosZ,VelX,VelY,VelZ,AccX,AccY,AccZ\n";
   dataLog.forEach((row) => {
-    csv +=
-      `${row.t.toFixed(3)},${row.x.toFixed(3)},${row.y.toFixed(
-        3
-      )},${row.z.toFixed(3)},` +
+    csv += `${row.t.toFixed(3)},${row.x.toFixed(3)},${row.y.toFixed(3)},${row.z.toFixed(3)},` +
       `${row.vx.toFixed(3)},${row.vy.toFixed(3)},${row.vz.toFixed(3)},` +
       `${row.ax.toFixed(3)},${row.ay.toFixed(3)},${row.az.toFixed(3)}\n`;
   });
-
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -824,18 +838,10 @@ function downloadCSV() {
   URL.revokeObjectURL(url);
 }
 
-// Watchers
-watch(params, () => {
-  if (!isRunning.value) resetSimulation();
-});
+watch(params, () => { if (!isRunning.value) resetSimulation(); });
 </script>
 
 <style scoped>
-/* Custom styling to ensure chart fits nicely */
-canvas {
-  display: block;
-}
-.drawer-side {
-  scroll-behavior: smooth;
-}
+canvas { display: block; }
+.drawer-side { scroll-behavior: smooth; }
 </style>

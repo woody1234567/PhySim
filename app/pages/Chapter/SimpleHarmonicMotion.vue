@@ -25,6 +25,79 @@
             x: {{ formattedX }} m | t: {{ formattedTime }} s
           </div>
         </div>
+
+        <!-- Help Button (Top Left Overlay) -->
+        <button
+          @click="showHelpModal = true"
+          class="absolute top-16 left-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all pointer-events-auto shadow-md"
+          title="Physics Explanation"
+        >
+          <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+        </button>
+
+        <!-- Physics Help Modal -->
+        <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+          <div class="modal-box max-w-2xl bg-base-100 border border-base-300 text-base-content">
+            <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+              <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+              Physics Concepts: Simple Harmonic Motion (SHM)
+            </h3>
+
+            <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+              <section>
+                <h4 class="font-bold text-lg text-secondary">1. Hooke's Law</h4>
+                <p>
+                  SHM is defined by a restoring force that is proportional to the displacement from equilibrium:
+                </p>
+                <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                  <MathLatex formula="F = -k \cdot x" :inline="false" />
+                </div>
+                <p>
+                  where <MathLatex formula="k" /> is the spring constant and <MathLatex formula="x" /> is the displacement. The negative sign indicates the force is always directed toward the equilibrium position.
+                </p>
+              </section>
+
+              <section>
+                <h4 class="font-bold text-lg text-secondary">2. Frequency & Period</h4>
+                <p>
+                  The oscillation period (<MathLatex formula="T" />) and angular frequency (<MathLatex formula="\omega" />) depend only on the mass (<MathLatex formula="m" />) and spring constant (<MathLatex formula="k" />):
+                </p>
+                <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                  <MathLatex formula="\omega = \sqrt{\frac{k}{m}}, \quad T = 2\pi \sqrt{\frac{m}{k}}" :inline="false" />
+                </div>
+                <p class="text-xs italic opacity-70">Note: In an ideal system, the period is independent of the oscillation amplitude.</p>
+              </section>
+
+              <section>
+                <h4 class="font-bold text-lg text-secondary">3. Energy Conversion</h4>
+                <p>
+                  Energy continuously oscillates between <strong>Elastic Potential Energy</strong> and <strong>Kinetic Energy</strong>:
+                </p>
+                <ul class="list-disc ml-6 mt-2 space-y-1">
+                  <li><strong>Elastic PE:</strong> <MathLatex formula="U = \frac{1}{2} k x^2" /> (Maximum at extremes)</li>
+                  <li><strong>Kinetic Energy:</strong> <MathLatex formula="K = \frac{1}{2} m v^2" /> (Maximum at equilibrium)</li>
+                  <li><strong>Total Energy:</strong> <MathLatex formula="E_{total} = U + K = constant" /></li>
+                </ul>
+              </section>
+
+              <section>
+                <h4 class="font-bold text-lg text-secondary">4. Controls Guide</h4>
+                <ul class="list-disc ml-6 space-y-2">
+                  <li><strong>Mass (m):</strong> Increasing mass slows down the oscillation (increases period).</li>
+                  <li><strong>Spring Constant (k):</strong> A stiffer spring increases the frequency of oscillation.</li>
+                  <li><strong>Initial Displacement:</strong> Sets the amplitude of the motion.</li>
+                </ul>
+              </section>
+            </div>
+
+            <div class="modal-action mt-6">
+              <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+            </div>
+          </div>
+          <form method="dialog" class="modal-backdrop">
+            <button @click="showHelpModal = false">close</button>
+          </form>
+        </dialog>
       </div>
 
       <!-- Resizer Handle -->
@@ -42,14 +115,23 @@
         :style="{ width: sidebarWidth + 'px' }"
       >
         <div
-          class="p-4 border-b border-base-content/10 bg-base-200/50 backdrop-blur"
+          class="p-4 border-b border-base-content/10 bg-base-200/50 backdrop-blur flex justify-between items-center"
         >
-          <h2
-            class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary"
-          >
-            SHM Simulator
-          </h2>
-          <p class="text-xs opacity-60">Spring-Mass System</p>
+          <div>
+            <h2
+              class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary"
+            >
+              SHM Simulator
+            </h2>
+            <p class="text-xs opacity-60">Spring-Mass System</p>
+          </div>
+          <UButton
+            icon="i-lucide-book-open"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click.stop="showHelpModal = true"
+          />
         </div>
 
         <div class="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-thin">
@@ -317,6 +399,7 @@ const isRunning = ref(false);
 const sidebarWidth = ref(320);
 const minSidebarWidth = 260;
 const minCanvasWidth = 300;
+const showHelpModal = ref(true); // Auto-show on first load
 let isResizing = false;
 
 // Data Logging
@@ -329,7 +412,7 @@ interface LogEntry {
   pe: number;
 }
 const dataLog = ref<LogEntry[]>([]);
-const MAX_LOG_ENTRIES = 1000; // Limit for memory safety
+const MAX_LOG_ENTRIES = 1000;
 
 /* -------------------------------------------------------------------------- */
 /*                                THREE.JS REFS                               */
@@ -378,7 +461,6 @@ onMounted(() => {
     initChart();
     resetSimulation();
     startAnimationLoop();
-
     window.addEventListener("resize", onWindowResize);
   }
 });
@@ -387,7 +469,6 @@ onUnmounted(() => {
   if (process.client) {
     cancelAnimationFrame(animationFrameId);
     window.removeEventListener("resize", onWindowResize);
-
     if (renderer) renderer.dispose();
     if (chartInstance) chartInstance.destroy();
   }
@@ -398,113 +479,54 @@ onUnmounted(() => {
 /* -------------------------------------------------------------------------- */
 function initThree() {
   if (!canvasRef.value || !canvasContainer.value) return;
-
-  // Scene
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x111111);
   scene.fog = new THREE.Fog(0x111111, 10, 50);
-
-  // Camera
-  const aspect =
-    canvasContainer.value.clientWidth / canvasContainer.value.clientHeight;
+  const aspect = canvasContainer.value.clientWidth / canvasContainer.value.clientHeight;
   camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
   camera.position.set(0, 5, 10);
   camera.lookAt(0, 0, 0);
-
-  // Renderer
-  renderer = new THREE.WebGLRenderer({
-    canvas: canvasRef.value,
-    antialias: true,
-  });
+  renderer = new THREE.WebGLRenderer({ canvas: canvasRef.value, antialias: true, });
   renderer.shadowMap.enabled = true;
-  renderer.setSize(
-    canvasContainer.value.clientWidth,
-    canvasContainer.value.clientHeight,
-  );
+  renderer.setSize(canvasContainer.value.clientWidth, canvasContainer.value.clientHeight,);
   renderer.setPixelRatio(window.devicePixelRatio);
-
-  // Lighting
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
   scene.add(ambientLight);
-
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
   dirLight.position.set(5, 10, 7);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 1024;
-  dirLight.shadow.mapSize.height = 1024;
+  dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
   scene.add(dirLight);
-
-  // Grid
   gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
   scene.add(gridHelper);
-
-  // Wall (Visual Anchor)
   const wallGeom = new THREE.BoxGeometry(0.2, 2, 2);
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
   wallMesh = new THREE.Mesh(wallGeom, wallMat);
   wallMesh.position.set(-6, 1, 0);
-  wallMesh.castShadow = true;
-  wallMesh.receiveShadow = true;
+  wallMesh.castShadow = true; wallMesh.receiveShadow = true;
   scene.add(wallMesh);
-
-  // Block
   const blockGeom = new THREE.BoxGeometry(1, 1, 1);
-  const blockMat = new THREE.MeshStandardMaterial({
-    color: 0x3b82f6,
-    roughness: 0.2,
-    metalness: 0.1,
-  });
+  const blockMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.2, metalness: 0.1, });
   blockMesh = new THREE.Mesh(blockGeom, blockMat);
-  blockMesh.castShadow = true;
-  blockMesh.receiveShadow = true;
+  blockMesh.castShadow = true; blockMesh.receiveShadow = true;
   scene.add(blockMesh);
-
-  // Spring Visual (ZigZag Line)
-  // We'll update geometry in render loop
-  const springPoints = [];
-  for (let i = 0; i < 20; i++) {
-    springPoints.push(new THREE.Vector3(0, 0, 0));
-  }
+  const springPoints = []; for (let i = 0; i < 20; i++) springPoints.push(new THREE.Vector3(0, 0, 0));
   const springGeom = new THREE.BufferGeometry().setFromPoints(springPoints);
-  const springMat = new THREE.LineBasicMaterial({
-    color: 0xef4444,
-    linewidth: 2,
-  });
+  const springMat = new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 2, });
   springLine = new THREE.Line(springGeom, springMat);
   scene.add(springLine);
 }
 
 function initPhysics() {
   world = new CANNON.World();
-  world.gravity.set(0, 0, 0); // No gravity for horizontal SHM
+  world.gravity.set(0, 0, 0);
   world.broadphase = new CANNON.NaiveBroadphase();
-
-  // Physics Material
   const material = new CANNON.Material("frictionless");
-
-  // Block Body
   const shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-  blockBody = new CANNON.Body({
-    mass: params.mass,
-    material: material,
-  });
+  blockBody = new CANNON.Body({ mass: params.mass, material: material, });
   blockBody.addShape(shape);
-  blockBody.linearDamping = 0.0; // No damping for ideal SHM
+  blockBody.linearDamping = 0.0;
   world.addBody(blockBody);
-
-  // Setup Force Application (The "Spring")
-  world.addEventListener("postStep", () => {
-    // F = -kx
-    // Force is applied to the center of mass
-    const x = blockBody.position.x;
-    const f = -params.k * x;
-    blockBody.force.x += f;
-
-    // Derived values for chart/log
-    const a = f / params.mass;
-    currentData.acceleration = a;
-    currentData.force = f;
-  });
 }
 
 function initOrbitControls() {
@@ -515,187 +537,82 @@ function initOrbitControls() {
 
 function initChart() {
   if (!chartCanvasRef.value) return;
-
   chartInstance = new Chart(chartCanvasRef.value, {
     type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: "Position (m)",
-          data: [],
-          borderColor: "#3b82f6",
-          tension: 0.1,
-          pointRadius: 0,
-        },
-      ],
-    },
+    data: { labels: [], datasets: [{ label: "Position (m)", data: [], borderColor: "#3b82f6", tension: 0.1, pointRadius: 0, },], },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
+      responsive: true, maintainAspectRatio: false, animation: false,
       scales: {
-        x: {
-          title: { display: true, text: "Time (s)" },
-          grid: { color: "rgba(255, 255, 255, 0.1)" },
-          ticks: { color: "#888" },
-        },
-        y: {
-          title: { display: true, text: "Value" },
-          grid: { color: "rgba(255, 255, 255, 0.1)" },
-          ticks: { color: "#888" },
-        },
+        x: { title: { display: true, text: "Time (s)" }, grid: { color: "rgba(255, 255, 255, 0.1)" }, ticks: { color: "#888" }, },
+        y: { title: { display: true, text: "Value" }, grid: { color: "rgba(255, 255, 255, 0.1)" }, ticks: { color: "#888" }, },
       },
-      plugins: {
-        legend: { labels: { color: "#ccc" } },
-      },
+      plugins: { legend: { labels: { color: "#ccc" } }, },
     },
   });
 }
 
-/* -------------------------------------------------------------------------- */
-/*                             SIMULATION LOGIC                               */
-/* -------------------------------------------------------------------------- */
-
 function resetSimulation() {
   isRunning.value = false;
-
-  // Reset Physics
   blockBody.position.set(params.initialX, 0.5, 0);
   blockBody.velocity.set(0, 0, 0);
   blockBody.angularVelocity.set(0, 0, 0);
   blockBody.force.set(0, 0, 0);
-
-  // Update mass if changed
   blockBody.mass = params.mass;
   blockBody.updateMassProperties();
-
-  // Reset Time
   currentData.time = 0;
-
-  // Clear Logs
   dataLog.value = [];
-
-  // Reset Charts
-  if (chartInstance) {
-    chartInstance.data.labels = [];
-    chartInstance.data.datasets[0].data = [];
-    chartInstance.update();
-  }
-
-  // Initial Sync
+  if (chartInstance) { chartInstance.data.labels = []; chartInstance.data.datasets[0].data = []; chartInstance.update(); }
   syncVisuals();
 }
 
-function toggleSimulation() {
-  isRunning.value = !isRunning.value;
-}
+function toggleSimulation() { isRunning.value = !isRunning.value; }
 
 function stepSimulation() {
   if (!isRunning.value) return;
-
   const dt = 1 / 60;
-
-  // Manual force application is handled in 'postStep' hook logic
-  // essentially, but we can also do it pre-step here to be explicit
-  // However, we used postStep event or preStep.
-  // Let's stick to doing it right before step for clarity:
-  blockBody.force.set(0, 0, 0); // Clear previous forces
+  blockBody.force.set(0, 0, 0);
   const x = blockBody.position.x;
   const f = -params.k * x;
   blockBody.force.x = f;
-
   world.step(dt);
   currentData.time += dt;
-
   logFrame(dt);
 }
 
 function logFrame(dt: number) {
-  // Update Current Data
   currentData.position = blockBody.position.x;
   currentData.velocity = blockBody.velocity.x;
-  currentData.acceleration = blockBody.force.x / blockBody.mass; // F=ma
+  currentData.acceleration = blockBody.force.x / blockBody.mass;
   currentData.force = blockBody.force.x;
-
-  // Energy
   const ke = 0.5 * params.mass * blockBody.velocity.x ** 2;
   const pe = 0.5 * params.k * blockBody.position.x ** 2;
   currentData.energy = ke + pe;
-
-  // Add to Log (throttle to every 5 frames to save memory if needed, or keeping it tight for now)
-  // For charts, simpler to log every frame but limit total history?
-  // Let's log every 10th frame roughly (0.16s resolution) for UI performance
-  // Actually, let's just log every frame but verify size
-
-  if (dataLog.value.length < MAX_LOG_ENTRIES) {
-    dataLog.value.push({
-      time: currentData.time,
-      x: currentData.position,
-      v: currentData.velocity,
-      a: currentData.acceleration,
-      ke,
-      pe,
-    });
-  } else {
-    // Rolling buffer maybe? Or just stop logging to keep memory safe
-    // For this assignment, stopping is safer or shifting
-    // dataLog.value.shift()
-    // dataLog.value.push(...)
-    // Let's shift to keep latest
-    dataLog.value.shift();
-    dataLog.value.push({
-      time: currentData.time,
-      x: currentData.position,
-      v: currentData.velocity,
-      a: currentData.acceleration,
-      ke,
-      pe,
-    });
-  }
+  if (dataLog.value.length >= MAX_LOG_ENTRIES) dataLog.value.shift();
+  dataLog.value.push({ time: currentData.time, x: currentData.position, v: currentData.velocity, a: currentData.acceleration, ke, pe, });
 }
 
 function startAnimationLoop() {
   const animate = () => {
     animationFrameId = requestAnimationFrame(animate);
-
-    // Physics
     stepSimulation();
-
-    // Render
     syncVisuals();
     controls.update();
     renderer.render(scene, camera);
-
-    // Note: Charts are updated manually via "Update Plot" button to maintain performance
   };
   animate();
 }
 
 function syncVisuals() {
-  // Block
   blockMesh.position.copy(blockBody.position as any);
   blockMesh.quaternion.copy(blockBody.quaternion as any);
-
-  // Spring Visual
-  // Wall is at x = -6 (visual anchor)
-  // Block attach point is at blockBody.position.x - 0.5 (left face of block)
-  const startX = -6 + 0.1; // Just slightly off the wall center
+  const startX = -6 + 0.1;
   const endX = blockBody.position.x - 0.5;
-
   if (springLine) {
-    const points = [];
-    const coils = 20;
-    const radius = 0.3;
-    const distance = endX - startX;
-
-    // Generate zigzag or helix vertices
+    const points = []; const coils = 20; const radius = 0.3; const distance = endX - startX;
     for (let i = 0; i <= coils; i++) {
       const t = i / coils;
       const x = startX + distance * t;
-      const y = Math.sin(t * Math.PI * 10) * radius + 1; // +1 for height offset (center of block is y=0.5, so height 1 is wrong? Block py=0.5. Spring should be at y=0.5)
-      // Wait, block y is 0.5 (resting on ground). So center is y=0.5.
-      const y_spring = 0.5 + Math.sin(t * Math.PI * 2 * 5) * radius; // 5 turns
+      const y_spring = 0.5 + Math.sin(t * Math.PI * 2 * 5) * radius;
       const z_spring = Math.cos(t * Math.PI * 2 * 5) * radius;
       points.push(new THREE.Vector3(x, y_spring, z_spring));
     }
@@ -703,166 +620,62 @@ function syncVisuals() {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                               UI INTERACTION                               */
-/* -------------------------------------------------------------------------- */
-
-function onParamsChange() {
-  // If running, we might want to apply parameters dynamically
-  blockBody.mass = params.mass;
-  blockBody.updateMassProperties();
-}
+function onParamsChange() { blockBody.mass = params.mass; blockBody.updateMassProperties(); }
 
 function updateChart() {
   if (!chartInstance) return;
-
   const labels = dataLog.value.map((d) => d.time.toFixed(2));
-  let data: number[] = [];
-  let label = "";
-  let color = "";
-
+  let data: number[] = []; let label = ""; let color = "";
   switch (activeChart.value) {
-    case "x":
-      data = dataLog.value.map((d) => d.x);
-      label = "Position (m)";
-      color = "#3b82f6"; // Primary
-      break;
-    case "v":
-      data = dataLog.value.map((d) => d.v);
-      label = "Velocity (m/s)";
-      color = "#ec4899"; // Secondary
-      break;
-    case "a":
-      data = dataLog.value.map((d) => d.a);
-      label = "Acceleration (m/s²)";
-      color = "#10b981"; // Accent
-      break;
+    case "x": data = dataLog.value.map((d) => d.x); label = "Position (m)"; color = "#3b82f6"; break;
+    case "v": data = dataLog.value.map((d) => d.v); label = "Velocity (m/s)"; color = "#ec4899"; break;
+    case "a": data = dataLog.value.map((d) => d.a); label = "Acceleration (m/s²)"; color = "#10b981"; break;
   }
-
-  chartInstance.data.labels = labels;
-  chartInstance.data.datasets[0].data = data;
-  chartInstance.data.datasets[0].label = label;
-  chartInstance.data.datasets[0].borderColor = color;
-  chartInstance.update();
+  chartInstance.data.labels = labels; chartInstance.data.datasets[0].data = data; chartInstance.data.datasets[0].label = label; chartInstance.data.datasets[0].borderColor = color; chartInstance.update();
 }
 
 function exportLogsToCSV() {
-  const headers = [
-    "Time (s)",
-    "Position (m)",
-    "Velocity (m/s)",
-    "Acceleration (m/s²)",
-    "Kinetic Energy (J)",
-    "Potential Energy (J)",
-  ];
-  const rows = dataLog.value.map((d) => [
-    d.time.toFixed(3),
-    d.x.toFixed(4),
-    d.v.toFixed(4),
-    d.a.toFixed(4),
-    d.ke.toFixed(4),
-    d.pe.toFixed(4),
-  ]);
-
+  const headers = ["Time (s)", "Position (m)", "Velocity (m/s)", "Acceleration (m/s²)", "Kinetic Energy (J)", "Potential Energy (J)",];
+  const rows = dataLog.value.map((d) => [ d.time.toFixed(3), d.x.toFixed(4), d.v.toFixed(4), d.a.toFixed(4), d.ke.toFixed(4), d.pe.toFixed(4), ]);
   downloadCSV(headers, rows, "shm_simulation_data.csv");
 }
 
 function exportChartCSV() {
-  const headers = ["Time (s)", activeChart.value];
-  let rows: any[] = [];
-
-  if (activeChart.value === "x") {
-    rows = dataLog.value.map((d) => [d.time.toFixed(3), d.x.toFixed(4)]);
-  } else if (activeChart.value === "v") {
-    rows = dataLog.value.map((d) => [d.time.toFixed(3), d.v.toFixed(4)]);
-  } else {
-    rows = dataLog.value.map((d) => [d.time.toFixed(3), d.a.toFixed(4)]);
-  }
-
+  const headers = ["Time (s)", activeChart.value]; let rows: any[] = [];
+  if (activeChart.value === "x") rows = dataLog.value.map((d) => [d.time.toFixed(3), d.x.toFixed(4)]);
+  else if (activeChart.value === "v") rows = dataLog.value.map((d) => [d.time.toFixed(3), d.v.toFixed(4)]);
+  else rows = dataLog.value.map((d) => [d.time.toFixed(3), d.a.toFixed(4)]);
   downloadCSV(headers, rows, `shm_chart_${activeChart.value}.csv`);
 }
 
 function downloadCSV(headers: string[], rows: any[][], filename: string) {
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) => row.join(",")),
-  ].join("\n");
-
+  const csvContent = [headers.join(","), ...rows.map((row) => row.join(",")), ].join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", filename); document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
-
-/* -------------------------------------------------------------------------- */
-/*                                WINDOW RESIZE                               */
-/* -------------------------------------------------------------------------- */
 
 function onWindowResize() {
   if (canvasContainer.value && canvasRef.value) {
-    // Clamp sidebar if window gets too small
     const maxSidebar = window.innerWidth - minCanvasWidth;
-    if (sidebarWidth.value > maxSidebar) {
-      sidebarWidth.value = maxSidebar;
-    }
-
-    const w = canvasContainer.value.clientWidth;
-    const h = canvasContainer.value.clientHeight;
-
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
+    if (sidebarWidth.value > maxSidebar) sidebarWidth.value = maxSidebar;
+    const w = canvasContainer.value.clientWidth; const h = canvasContainer.value.clientHeight;
+    camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
   }
 }
 
-function startResize() {
-  isResizing = true;
-  document.body.style.cursor = "col-resize";
-  document.body.style.userSelect = "none";
-  window.addEventListener("mouseup", stopResize);
-  window.addEventListener("mousemove", onResizerMove);
-}
-
-function stopResize() {
-  isResizing = false;
-  document.body.style.cursor = "";
-  document.body.style.userSelect = "";
-  window.removeEventListener("mouseup", stopResize);
-  window.removeEventListener("mousemove", onResizerMove);
-  onWindowResize(); // Final adjustment
-}
-
+function startResize() { isResizing = true; document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none"; window.addEventListener("mouseup", stopResize); window.addEventListener("mousemove", onResizerMove); }
+function stopResize() { isResizing = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; window.removeEventListener("mouseup", stopResize); window.removeEventListener("mousemove", onResizerMove); onWindowResize(); }
 function onResizerMove(e: MouseEvent) {
   if (!isResizing) return;
-
   const newWidth = window.innerWidth - e.clientX;
-
-  // Constraints
   const maxAllowed = window.innerWidth - minCanvasWidth;
-
-  if (newWidth >= minSidebarWidth && newWidth <= Math.min(600, maxAllowed)) {
-    sidebarWidth.value = newWidth;
-    onWindowResize();
-  }
+  if (newWidth >= minSidebarWidth && newWidth <= Math.min(600, maxAllowed)) { sidebarWidth.value = newWidth; onWindowResize(); }
 }
 </script>
 
 <style scoped>
-/* Scrollbar styling for sidebar */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.3);
-  border-radius: 3px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.5);
-}
+.scrollbar-thin::-webkit-scrollbar { width: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.3); border-radius: 3px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background-color: rgba(156, 163, 175, 0.5); }
 </style>

@@ -19,6 +19,84 @@
         </div>
       </div>
 
+      <!-- Help Button (Top Left Overlay) -->
+      <button
+        @click="showHelpModal = true"
+        class="absolute top-16 left-4 btn btn-circle btn-ghost btn-md z-10 text-primary-focus bg-base-100/50 backdrop-blur hover:bg-base-200 transition-all pointer-events-auto"
+        title="Physics Explanation"
+      >
+        <Icon name="heroicons:question-mark-circle" class="text-3xl" />
+      </button>
+
+      <!-- Physics Help Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showHelpModal }">
+        <div class="modal-box max-w-2xl bg-base-100 border border-base-300 text-base-content">
+          <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <Icon name="heroicons:academic-cap" class="text-primary text-3xl" />
+            Physics Concepts: Simple Pendulum
+          </h3>
+
+          <div class="space-y-4 text-sm leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+            <section>
+              <h4 class="font-bold text-lg text-secondary">1. Harmonic Motion</h4>
+              <p>
+                A simple pendulum consists of a mass (bob) suspended from a fixed pivot by a string of length <MathLatex formula="L" />. For small angles, it approximates Simple Harmonic Motion (SHM).
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="T \approx 2\pi \sqrt{\frac{L}{g}}" :inline="false" />
+              </div>
+              <p>
+                where <MathLatex formula="T" /> is the period and <MathLatex formula="g" /> is gravitational acceleration.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">2. Restoration Force & Tension</h4>
+              <p>
+                The restoring force that drives the oscillation is the tangential component of gravity:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="F_{restore} = -m \cdot g \cdot \sin(\theta)" :inline="false" />
+              </div>
+              <p>
+                The tension in the wire (<MathLatex formula="\vec{T}" />) must counteract the radial component of gravity and provide the centripetal force:
+              </p>
+              <div class="bg-base-200 p-3 rounded-lg font-mono text-center my-2 italic">
+                <MathLatex formula="T = m \cdot g \cdot \cos(\theta) + m \frac{v^2}{L}" :inline="false" />
+              </div>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">3. Vector Visualization</h4>
+              <p>
+                The simulation displays real-time vector arrows for:
+              </p>
+              <ul class="list-disc ml-6 space-y-1">
+                <li><span class="text-green-500 font-bold">Velocity:</span> Direction of motion.</li>
+                <li><span class="text-red-500 font-bold">Acceleration:</span> Net change in velocity.</li>
+                <li><span class="text-yellow-500 font-bold">Tension:</span> Force exerted by the wire towards the pivot.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h4 class="font-bold text-lg text-secondary">4. Controls Guide</h4>
+              <ul class="list-disc ml-6 space-y-2">
+                <li><strong>Wire Length:</strong> Longer wires result in slower oscillations (longer periods).</li>
+                <li><strong>Bob Mass:</strong> In an ideal pendulum, mass does not affect the period, but it scales the force magnitudes (Tension).</li>
+                <li><strong>Initial Angle:</strong> Defines the amplitude of oscillation. Larger angles deviate from SHM.</li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="modal-action mt-6">
+            <button class="btn btn-primary" @click="showHelpModal = false">Got it!</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button @click="showHelpModal = false">close</button>
+        </form>
+      </dialog>
+
       <!-- Overlay: Legend -->
       <div
         class="absolute top-4 right-4 pointer-events-none bg-base-100/80 p-2 rounded border border-base-300 text-xs shadow-lg backdrop-blur"
@@ -53,7 +131,13 @@
         class="p-4 border-b border-base-300 font-bold text-lg bg-base-200 flex justify-between items-center"
       >
         <span>Pendulum Lab</span>
-        <div class="badge badge-ghost badge-sm">Physics Engine</div>
+        <UButton
+          icon="i-lucide-book-open"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click.stop="showHelpModal = true"
+        />
       </div>
 
       <div class="flex-grow overflow-y-auto p-2 space-y-2 custom-scrollbar">
@@ -292,6 +376,7 @@ interface LogEntry {
 const sidebarWidth = ref(340);
 const canvasContainer = ref<HTMLElement | null>(null);
 const isRunning = ref(false);
+const showHelpModal = ref(true); // Auto-show on first load
 
 // Physics Configuration
 const params = reactive({
