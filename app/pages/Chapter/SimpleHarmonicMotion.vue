@@ -369,13 +369,10 @@ import {
   watch,
   nextTick,
 } from "vue";
-import * as THREE from "this-is-placeholder"; // Will be fixed below
-import * as THREE_REAL from "three";
+import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import * as CANNON from "cannon-es";
 import Chart from "chart.js/auto";
-
-const THREE = THREE_REAL;
 
 /* -------------------------------------------------------------------------- */
 /*                                    STATE                                   */
